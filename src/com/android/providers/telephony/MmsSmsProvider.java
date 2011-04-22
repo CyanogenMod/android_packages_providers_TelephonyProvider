@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import android.app.SearchManager;
@@ -467,7 +468,7 @@ public class MmsSmsProvider extends ContentProvider {
         if (!isPhoneNumber) {
             selectionArgs = new String[] { refinedAddress };
         } else {
-            selection += " OR " + String.format("PHONE_NUMBERS_EQUAL(address, ?, %d)",
+            selection += " OR " + String.format(Locale.US, "PHONE_NUMBERS_EQUAL(address, ?, %d)",
                         (mUseStrictPhoneNumberComparation ? 1 : 0));
             selectionArgs = new String[] { refinedAddress, refinedAddress };
         }
