@@ -7,4 +7,8 @@
         <item>310120</item>
         <item>311480</item>
     </string-array>
+
+    <!-- The preferred APN to use, in the format name,mcc,mnc
+         Leave empty to choose automatically. -->
+    <string name="config_preferred_apn"></string>
 </resources>
