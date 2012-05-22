@@ -383,6 +383,24 @@ public class TelephonyProvider extends ContentProvider
             }
         }
 
+        private int getDefaultPreferredApnId(SQLiteDatabase db) {
+            int id = -1;
+            String configPref = mContext.getResources().getString(R.string.config_preferred_apn, "");
+            if (!TextUtils.isEmpty(configPref)) {
+                String[] s = configPref.split(",");
+                if (s.length == 3) {
+                    Cursor c = db.query("carriers", new String[] { "_id" },
+                            "apn='" + s[0] + "' AND mcc='" + s[1] + "' AND mnc='" + s[2] + "'",
+                            null, null, null, null);
+                    if (c.moveToFirst()) {
+                        id = c.getInt(0);
+                    }
+                    c.close();
+                }
+            }
+            return id;
+        }
+
         /**
          *  This function adds APNs from xml file(s) to db. The db may or may not be empty to begin
          *  with.
@@ -1522,13 +1540,32 @@ public class TelephonyProvider extends ContentProvider
                 Context.MODE_PRIVATE);
         long apnId = sp.getLong(COLUMN_APN_ID + subId, INVALID_APN_ID);
         if (apnId == INVALID_APN_ID && checkApnSp) {
-            apnId = getPreferredApnIdFromApn(subId);
-            if (apnId != INVALID_APN_ID) {
+            apnId = getDefaultPreferredApnId();
+            if (apnId > INVALID_APN_ID) {
                 setPreferredApnId(apnId, subId);
                 deletePreferredApn(subId);
             }
         }
         return apnId;
+    }
+
+    private long getDefaultPreferredApnId() {
+        long id = -1;
+        String configPref = getContext().getResources().getString(R.string.config_preferred_apn, "");
+        if (!TextUtils.isEmpty(configPref)) {
+            String[] s = configPref.split(",");
+            if (s.length == 3) {
+                Cursor c = mOpenHelper.getReadableDatabase().query("carriers", new String[] { "_id" },
+                        "apn='" + s[0] + "' AND mcc='" + s[1] + "' AND mnc='" + s[2] + "'",
+                        null, null, null, null);
+                if (c.moveToFirst()) {
+                    id = c.getLong(0);
+                }
+                c.close();
+            }
+        }
+        Log.d(TAG, "Preferred APN: " + id);
+        return id;
     }
 
     private void deletePreferredApnId() {
@@ -2241,6 +2278,7 @@ public class TelephonyProvider extends ContentProvider
         }
         setPreferredApnId((long) INVALID_APN_ID, subId);
         mOpenHelper.initDatabase(db);
+        setPreferredApnId(getDefaultPreferredApnId(), subId);
     }
 
     private synchronized void updateApnDb() {
