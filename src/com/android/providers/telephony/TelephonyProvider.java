@@ -36,6 +36,7 @@ import android.os.FileUtils;
 import android.provider.Telephony;
 import android.telephony.MSimTelephonyManager;
 import android.telephony.TelephonyManager;
+import android.text.TextUtils;
 import android.util.Log;
 import android.util.Xml;
 
@@ -160,6 +161,24 @@ public class TelephonyProvider extends ContentProvider
                     "preferred BOOLEAN DEFAULT 0);");
 
             initDatabase(db);
+        }
+
+        private int getDefaultPreferredApnId(SQLiteDatabase db) {
+            int id = -1;
+            String configPref = mContext.getResources().getString(R.string.config_preferred_apn, "");
+            if (!TextUtils.isEmpty(configPref)) {
+                String[] s = configPref.split(",");
+                if (s.length == 3) {
+                    Cursor c = db.query("carriers", new String[] { "_id" },
+                            "apn='" + s[0] + "' AND mcc='" + s[1] + "' AND mnc='" + s[2] + "'",
+                            null, null, null, null);
+                    if (c.moveToFirst()) {
+                        id = c.getInt(0);
+                    }
+                    c.close();
+                }
+            }
+            return id;
         }
 
         private void initDatabase(SQLiteDatabase db) {
@@ -527,6 +546,11 @@ public class TelephonyProvider extends ContentProvider
                         String key = cursor.getString(ID_INDEX);
                         apnId = Long.valueOf(key);
                         Log.d(TAG, "Found an inital preferred apn. id = " + apnId);
+                    } else {
+                        apnId = getDefaultPreferredApnId();
+                        if (apnId > -1) {
+                                setPreferredApnId(apnId);
+                        }
                     }
                 } catch (SQLException e) {
                     Log.e(TAG, "got exception while checking initial preferred apn: " + e);
@@ -539,6 +563,25 @@ public class TelephonyProvider extends ContentProvider
 
     private long getPreferredApnId() {
         return getPreferredApnId(-1);
+    }
+
+    private long getDefaultPreferredApnId() {
+        long id = -1;
+        String configPref = getContext().getResources().getString(R.string.config_preferred_apn, "");
+        if (!TextUtils.isEmpty(configPref)) {
+            String[] s = configPref.split(",");
+            if (s.length == 3) {
+                Cursor c = mOpenHelper.getReadableDatabase().query("carriers", new String[] { "_id" },
+                        "apn='" + s[0] + "' AND mcc='" + s[1] + "' AND mnc='" + s[2] + "'",
+                        null, null, null, null);
+                if (c.moveToFirst()) {
+                    id = c.getLong(0);
+                }
+                c.close();
+            }
+        }
+        Log.d(TAG, "Preferred APN: " + id);
+        return id;
     }
 
     private long getAPNConfigCheckSum() {
@@ -943,5 +986,6 @@ public class TelephonyProvider extends ContentProvider
         }
         setPreferredApnId((long)-1);
         mOpenHelper.initDatabase(db);
+        setPreferredApnId(getDefaultPreferredApnId());
     }
 }
