@@ -148,8 +148,14 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                         "     (SELECT date * 1000 AS date, sub_cs AS snippet_cs, thread_id FROM pdu" +
                         "      UNION SELECT date, 0 AS snippet_cs, thread_id FROM sms)" +
                         "    WHERE thread_id = OLD.thread_id ORDER BY date DESC LIMIT 1) " +
-                        "  WHERE threads._id = OLD.thread_id; ";
-
+                        "  WHERE threads._id = OLD.thread_id; " +
+                        "  UPDATE threads SET read = " +
+                        "    CASE (SELECT COUNT(*) FROM pdu WHERE read = 0 AND old.thread_id = thread_id " +
+                        "      AND (m_type=132 OR m_type=130 OR m_type=128)) " +
+                        "      WHEN 0 THEN 1 " +
+                        "      ELSE 0 " +
+                        "    END " +
+                        "  WHERE threads._id = old.thread_id;";
 
     // When a part is inserted, if it is not text/plain or application/smil
     // (which both can exist with text-only MMSes), then there is an attachment.
@@ -808,7 +814,10 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "AFTER DELETE ON pdu " +
                    "BEGIN " +
                    "  UPDATE threads SET " +
-                   "     date = (strftime('%s','now') * 1000)" +
+                   "     date = (SELECT date FROM" +
+                   "        (SELECT date * 1000 AS date, thread_id FROM pdu" +
+                   "         UNION SELECT date, thread_id FROM sms)" +
+                   "     WHERE thread_id = old." + Mms.THREAD_ID + " ORDER BY date DESC LIMIT 1)" +
                    "  WHERE threads._id = old." + Mms.THREAD_ID + "; " +
                    UPDATE_THREAD_COUNT_ON_OLD +
                    UPDATE_THREAD_SNIPPET_SNIPPET_CS_ON_DELETE +
