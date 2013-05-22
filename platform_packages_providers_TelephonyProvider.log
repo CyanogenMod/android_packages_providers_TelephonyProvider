@@ -1,0 +1,1485 @@
+diff --git a/Android.mk b/Android.mk
+index b0f3906..68a9e0a 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -8,6 +8,7 @@ LOCAL_SRC_FILES := $(call all-subdir-java-files)
+ LOCAL_PACKAGE_NAME := TelephonyProvider
+ LOCAL_CERTIFICATE := platform
+ 
++LOCAL_JAVA_LIBRARIES += telephony-common mms-common
+ LOCAL_STATIC_JAVA_LIBRARIES += android-common
+ 
+ include $(BUILD_PACKAGE)
+diff --git a/AndroidManifest.xml b/AndroidManifest.xml
+index c0dc9c1..9906731 100644
+--- a/AndroidManifest.xml
++++ b/AndroidManifest.xml
+@@ -25,21 +25,24 @@
+                  android:allowClearUserData="false"
+                  android:allowBackup="false"
+                  android:label="@string/app_label"
+-                 android:icon="@drawable/ic_launcher_phone">
++                 android:icon="@mipmap/ic_launcher_phone">
+ 
+         <provider android:name="TelephonyProvider"
+                   android:authorities="telephony"
++                  android:exported="true"
+                   android:multiprocess="true" />
+ 
+         <provider android:name="SmsProvider"
+                   android:authorities="sms"
+                   android:multiprocess="true"
++                  android:exported="true"
+                   android:readPermission="android.permission.READ_SMS"
+                   android:writePermission="android.permission.WRITE_SMS" />
+ 
+         <provider android:name="MmsProvider"
+                   android:authorities="mms"
+                   android:multiprocess="true"
++                  android:exported="true"
+                   android:readPermission="android.permission.READ_SMS"
+                   android:writePermission="android.permission.WRITE_SMS">
+             <grant-uri-permission android:pathPrefix="/part/" />
+@@ -49,6 +52,7 @@
+         <provider android:name="MmsSmsProvider"
+                   android:authorities="mms-sms"
+                   android:multiprocess="true"
++                  android:exported="true"
+                   android:readPermission="android.permission.READ_SMS"
+                   android:writePermission="android.permission.WRITE_SMS" />
+     </application>
+diff --git a/res/drawable-hdpi/ic_launcher_phone.png b/res/drawable-hdpi/ic_launcher_phone.png
+deleted file mode 100644
+index c295e2b..0000000
+Binary files a/res/drawable-hdpi/ic_launcher_phone.png and /dev/null differ
+diff --git a/res/drawable-mdpi/ic_launcher_phone.png b/res/drawable-mdpi/ic_launcher_phone.png
+deleted file mode 100644
+index bd45541..0000000
+Binary files a/res/drawable-mdpi/ic_launcher_phone.png and /dev/null differ
+diff --git a/res/drawable-xhdpi/ic_launcher_phone.png b/res/drawable-xhdpi/ic_launcher_phone.png
+deleted file mode 100644
+index 2524ca2..0000000
+Binary files a/res/drawable-xhdpi/ic_launcher_phone.png and /dev/null differ
+diff --git a/res/mipmap-hdpi/ic_launcher_phone.png b/res/mipmap-hdpi/ic_launcher_phone.png
+new file mode 100644
+index 0000000..47d7894
+Binary files /dev/null and b/res/mipmap-hdpi/ic_launcher_phone.png differ
+diff --git a/res/mipmap-mdpi/ic_launcher_phone.png b/res/mipmap-mdpi/ic_launcher_phone.png
+new file mode 100644
+index 0000000..3b333cf
+Binary files /dev/null and b/res/mipmap-mdpi/ic_launcher_phone.png differ
+diff --git a/res/mipmap-xhdpi/ic_launcher_phone.png b/res/mipmap-xhdpi/ic_launcher_phone.png
+new file mode 100644
+index 0000000..020c2fa
+Binary files /dev/null and b/res/mipmap-xhdpi/ic_launcher_phone.png differ
+diff --git a/res/mipmap-xxhdpi/ic_launcher_phone.png b/res/mipmap-xxhdpi/ic_launcher_phone.png
+new file mode 100644
+index 0000000..1594e4e
+Binary files /dev/null and b/res/mipmap-xxhdpi/ic_launcher_phone.png differ
+diff --git a/res/values-fa/strings.xml b/res/values-fa/strings.xml
+index f710609..87e5239 100644
+--- a/res/values-fa/strings.xml
++++ b/res/values-fa/strings.xml
+@@ -16,6 +16,6 @@
+ 
+ <resources xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+-    <string name="app_label" product="tablet" msgid="9194799012395299737">"پیکربندی شبکه تلفن همراه"</string>
++    <string name="app_label" product="tablet" msgid="9194799012395299737">"پیکربندی شبکهٔ تلفن همراه"</string>
+     <string name="app_label" product="default" msgid="4282451239358791628">"حافظه تلفن/پیام رسانی"</string>
+ </resources>
+diff --git a/res/values-zh-rCN/strings.xml b/res/values-zh-rCN/strings.xml
+index 01e59a7..24545e5 100644
+--- a/res/values-zh-rCN/strings.xml
++++ b/res/values-zh-rCN/strings.xml
+@@ -17,5 +17,5 @@
+ <resources xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+     <string name="app_label" product="tablet" msgid="9194799012395299737">"移动网络配置"</string>
+-    <string name="app_label" product="default" msgid="4282451239358791628">"电话/信息存储"</string>
++    <string name="app_label" product="default" msgid="4282451239358791628">"电话/短信存储"</string>
+ </resources>
+diff --git a/src/com/android/providers/telephony/MmsProvider.java b/src/com/android/providers/telephony/MmsProvider.java
+index 5e3e1f1..ac7c1f9 100644
+--- a/src/com/android/providers/telephony/MmsProvider.java
++++ b/src/com/android/providers/telephony/MmsProvider.java
+@@ -16,7 +16,9 @@
+ 
+ package com.android.providers.telephony;
+ 
++import android.app.AppOpsManager;
+ import android.content.ContentProvider;
++import android.content.ContentResolver;
+ import android.content.ContentValues;
+ import android.content.Context;
+ import android.content.Intent;
+@@ -63,6 +65,7 @@ public class MmsProvider extends ContentProvider {
+ 
+     @Override
+     public boolean onCreate() {
++        setAppOps(AppOpsManager.OP_READ_SMS, AppOpsManager.OP_WRITE_SMS);
+         mOpenHelper = MmsSmsDatabaseHelper.getInstance(getContext());
+         return true;
+     }
+@@ -265,6 +268,10 @@ public class MmsProvider extends ContentProvider {
+ 
+     @Override
+     public Uri insert(Uri uri, ContentValues values) {
++        // Don't let anyone insert anything with the _data column
++        if (values != null && values.containsKey(Part._DATA)) {
++            return null;
++        }
+         int msgBox = Mms.MESSAGE_BOX_ALL;
+         boolean notify = true;
+ 
+@@ -679,6 +686,10 @@ public class MmsProvider extends ContentProvider {
+     @Override
+     public int update(Uri uri, ContentValues values,
+             String selection, String[] selectionArgs) {
++        // Don't let anyone update the _data column
++        if (values != null && values.containsKey(Part._DATA)) {
++            return 0;
++        }
+         int match = sURLMatcher.match(uri);
+         if (LOCAL_LOGV) {
+             Log.v(TAG, "Update uri=" + uri + ", match=" + match);
+@@ -764,20 +775,50 @@ public class MmsProvider extends ContentProvider {
+ 
+     @Override
+     public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
+-        // TODO do we even need this anymore?
+-        ParcelFileDescriptor fd;
+         int match = sURLMatcher.match(uri);
+ 
+         if (Log.isLoggable(TAG, Log.VERBOSE)) {
+-            Log.d(TAG, "openFile: uri=" + uri + ", mode=" + mode);
++            Log.d(TAG, "openFile: uri=" + uri + ", mode=" + mode + ", match=" + match);
+         }
+ 
+-        switch (match) {
+-            default:
+-                fd = openFileHelper(uri, mode);
++        if (match != MMS_PART_ID) {
++            return null;
++        }
++
++        // Verify that the _data path points to mms data
++        Cursor c = query(uri, new String[]{"_data"}, null, null, null);
++        int count = (c != null) ? c.getCount() : 0;
++        if (count != 1) {
++            // If there is not exactly one result, throw an appropriate
++            // exception.
++            if (c != null) {
++                c.close();
++            }
++            if (count == 0) {
++                throw new FileNotFoundException("No entry for " + uri);
++            }
++            throw new FileNotFoundException("Multiple items at " + uri);
++        }
++
++        c.moveToFirst();
++        int i = c.getColumnIndex("_data");
++        String path = (i >= 0 ? c.getString(i) : null);
++        c.close();
++
++        if (path == null) {
++            return null;
++        }
++        try {
++            File filePath = new File(path);
++            if (!filePath.getCanonicalPath()
++                    .startsWith(getContext().getApplicationInfo().dataDir + "/app_parts/")) {
++                return null;
++            }
++        } catch (IOException e) {
++            return null;
+         }
+ 
+-        return fd;
++        return openFileHelper(uri, mode);
+     }
+ 
+     private void filterUnsupportedKeys(ContentValues values) {
+diff --git a/src/com/android/providers/telephony/MmsSmsDatabaseHelper.java b/src/com/android/providers/telephony/MmsSmsDatabaseHelper.java
+index d0d410e..4f23be8 100644
+--- a/src/com/android/providers/telephony/MmsSmsDatabaseHelper.java
++++ b/src/com/android/providers/telephony/MmsSmsDatabaseHelper.java
+@@ -215,7 +215,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+     private static boolean sFakeLowStorageTest = false;     // for testing only
+ 
+     static final String DATABASE_NAME = "mmssms.db";
+-    static final int DATABASE_VERSION = 55;
++    static final int DATABASE_VERSION = 57;
+     private final Context mContext;
+     private LowStorageMonitor mLowStorageMonitor;
+ 
+@@ -242,7 +242,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+      * unreferenced rows from the canonical_addresses table.
+      */
+     private static void removeUnferencedCanonicalAddresses(SQLiteDatabase db) {
+-        Cursor c = db.query("threads", new String[] { "recipient_ids" },
++        Cursor c = db.query(MmsSmsProvider.TABLE_THREADS, new String[] { "recipient_ids" },
+                 null, null, null, null, null);
+         if (c != null) {
+             try {
+@@ -288,119 +288,136 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+             return;
+         }
+ 
+-        // Delete the row for this thread in the threads table if
+-        // there are no more messages attached to it in either
+-        // the sms or pdu tables.
+-        int rows = db.delete("threads",
+-                  "_id = ? AND _id NOT IN" +
+-                  "          (SELECT thread_id FROM sms " +
+-                  "           UNION SELECT thread_id FROM pdu)",
+-                  new String[] { String.valueOf(thread_id) });
+-        if (rows > 0) {
+-            // If this deleted a row, let's remove orphaned canonical_addresses and get outta here
+-            removeUnferencedCanonicalAddresses(db);
+-            return;
+-        }
+-        // Update the message count in the threads table as the sum
+-        // of all messages in both the sms and pdu tables.
+-        db.execSQL(
+-            "  UPDATE threads SET message_count = " +
+-            "     (SELECT COUNT(sms._id) FROM sms LEFT JOIN threads " +
+-            "      ON threads._id = " + Sms.THREAD_ID +
+-            "      WHERE " + Sms.THREAD_ID + " = " + thread_id +
+-            "        AND sms." + Sms.TYPE + " != 3) + " +
+-            "     (SELECT COUNT(pdu._id) FROM pdu LEFT JOIN threads " +
+-            "      ON threads._id = " + Mms.THREAD_ID +
+-            "      WHERE " + Mms.THREAD_ID + " = " + thread_id +
+-            "        AND (m_type=132 OR m_type=130 OR m_type=128)" +
+-            "        AND " + Mms.MESSAGE_BOX + " != 3) " +
+-            "  WHERE threads._id = " + thread_id + ";");
+-
+-        // Update the date and the snippet (and its character set) in
+-        // the threads table to be that of the most recent message in
+-        // the thread.
+-        db.execSQL(
+-            "  UPDATE threads" +
+-            "  SET" +
+-            "  date =" +
+-            "    (SELECT date FROM" +
+-            "        (SELECT date * 1000 AS date, thread_id FROM pdu" +
+-            "         UNION SELECT date, thread_id FROM sms)" +
+-            "     WHERE thread_id = " + thread_id + " ORDER BY date DESC LIMIT 1)," +
+-            "  snippet =" +
+-            "    (SELECT snippet FROM" +
+-            "        (SELECT date * 1000 AS date, sub AS snippet, thread_id FROM pdu" +
+-            "         UNION SELECT date, body AS snippet, thread_id FROM sms)" +
+-            "     WHERE thread_id = " + thread_id + " ORDER BY date DESC LIMIT 1)," +
+-            "  snippet_cs =" +
+-            "    (SELECT snippet_cs FROM" +
+-            "        (SELECT date * 1000 AS date, sub_cs AS snippet_cs, thread_id FROM pdu" +
+-            "         UNION SELECT date, 0 AS snippet_cs, thread_id FROM sms)" +
+-            "     WHERE thread_id = " + thread_id + " ORDER BY date DESC LIMIT 1)" +
+-            "  WHERE threads._id = " + thread_id + ";");
+-
+-        // Update the error column of the thread to indicate if there
+-        // are any messages in it that have failed to send.
+-        // First check to see if there are any messages with errors in this thread.
+-        String query = "SELECT thread_id FROM sms WHERE type=" +
+-            Telephony.TextBasedSmsColumns.MESSAGE_TYPE_FAILED +
+-            " AND thread_id = " + thread_id +
+-                                " LIMIT 1";
+-        int setError = 0;
+-        Cursor c = db.rawQuery(query, null);
+-        if (c != null) {
+-            try {
+-                setError = c.getCount();    // Because of the LIMIT 1, count will be 1 or 0.
+-            } finally {
+-                c.close();
+-            }
+-        }
+-        // What's the current state of the error flag in the threads table?
+-        String errorQuery = "SELECT error FROM threads WHERE _id = " + thread_id;
+-        c = db.rawQuery(errorQuery, null);
+-        if (c != null) {
+-            try {
+-                if (c.moveToNext()) {
+-                    int curError = c.getInt(0);
+-                    if (curError != setError) {
+-                        // The current thread error column differs, update it.
+-                        db.execSQL("UPDATE threads SET error=" + setError +
+-                                " WHERE _id = " + thread_id);
++        db.beginTransaction();
++        try {
++            // Delete the row for this thread in the threads table if
++            // there are no more messages attached to it in either
++            // the sms or pdu tables.
++            int rows = db.delete(MmsSmsProvider.TABLE_THREADS,
++                      "_id = ? AND _id NOT IN" +
++                      "          (SELECT thread_id FROM sms " +
++                      "           UNION SELECT thread_id FROM pdu)",
++                      new String[] { String.valueOf(thread_id) });
++            if (rows > 0) {
++                // If this deleted a row, let's remove orphaned canonical_addresses and get outta here
++                removeUnferencedCanonicalAddresses(db);
++            } else {
++                // Update the message count in the threads table as the sum
++                // of all messages in both the sms and pdu tables.
++                db.execSQL(
++                        "  UPDATE threads SET message_count = " +
++                                "     (SELECT COUNT(sms._id) FROM sms LEFT JOIN threads " +
++                                "      ON threads._id = " + Sms.THREAD_ID +
++                                "      WHERE " + Sms.THREAD_ID + " = " + thread_id +
++                                "        AND sms." + Sms.TYPE + " != 3) + " +
++                                "     (SELECT COUNT(pdu._id) FROM pdu LEFT JOIN threads " +
++                                "      ON threads._id = " + Mms.THREAD_ID +
++                                "      WHERE " + Mms.THREAD_ID + " = " + thread_id +
++                                "        AND (m_type=132 OR m_type=130 OR m_type=128)" +
++                                "        AND " + Mms.MESSAGE_BOX + " != 3) " +
++                                "  WHERE threads._id = " + thread_id + ";");
++
++                // Update the date and the snippet (and its character set) in
++                // the threads table to be that of the most recent message in
++                // the thread.
++                db.execSQL(
++                "  UPDATE threads" +
++                "  SET" +
++                "  date =" +
++                "    (SELECT date FROM" +
++                "        (SELECT date * 1000 AS date, thread_id FROM pdu" +
++                "         UNION SELECT date, thread_id FROM sms)" +
++                "     WHERE thread_id = " + thread_id + " ORDER BY date DESC LIMIT 1)," +
++                "  snippet =" +
++                "    (SELECT snippet FROM" +
++                "        (SELECT date * 1000 AS date, sub AS snippet, thread_id FROM pdu" +
++                "         UNION SELECT date, body AS snippet, thread_id FROM sms)" +
++                "     WHERE thread_id = " + thread_id + " ORDER BY date DESC LIMIT 1)," +
++                "  snippet_cs =" +
++                "    (SELECT snippet_cs FROM" +
++                "        (SELECT date * 1000 AS date, sub_cs AS snippet_cs, thread_id FROM pdu" +
++                "         UNION SELECT date, 0 AS snippet_cs, thread_id FROM sms)" +
++                "     WHERE thread_id = " + thread_id + " ORDER BY date DESC LIMIT 1)" +
++                "  WHERE threads._id = " + thread_id + ";");
++
++                // Update the error column of the thread to indicate if there
++                // are any messages in it that have failed to send.
++                // First check to see if there are any messages with errors in this thread.
++                String query = "SELECT thread_id FROM sms WHERE type=" +
++                        Telephony.TextBasedSmsColumns.MESSAGE_TYPE_FAILED +
++                        " AND thread_id = " + thread_id +
++                        " LIMIT 1";
++                int setError = 0;
++                Cursor c = db.rawQuery(query, null);
++                if (c != null) {
++                    try {
++                        setError = c.getCount();    // Because of the LIMIT 1, count will be 1 or 0.
++                    } finally {
++                        c.close();
++                    }
++                }
++                // What's the current state of the error flag in the threads table?
++                String errorQuery = "SELECT error FROM threads WHERE _id = " + thread_id;
++                c = db.rawQuery(errorQuery, null);
++                if (c != null) {
++                    try {
++                        if (c.moveToNext()) {
++                            int curError = c.getInt(0);
++                            if (curError != setError) {
++                                // The current thread error column differs, update it.
++                                db.execSQL("UPDATE threads SET error=" + setError +
++                                        " WHERE _id = " + thread_id);
++                            }
++                        }
++                    } finally {
++                        c.close();
+                     }
+                 }
+-            } finally {
+-                c.close();
+             }
++            db.setTransactionSuccessful();
++        } catch (Throwable ex) {
++            Log.e(TAG, ex.getMessage(), ex);
++        } finally {
++            db.endTransaction();
+         }
+     }
+ 
+     public static void updateAllThreads(SQLiteDatabase db, String where, String[] whereArgs) {
+-        if (where == null) {
+-            where = "";
+-        } else {
+-            where = "WHERE (" + where + ")";
+-        }
+-        String query = "SELECT _id FROM threads WHERE _id IN " +
+-                       "(SELECT DISTINCT thread_id FROM sms " + where + ")";
+-        Cursor c = db.rawQuery(query, whereArgs);
+-        if (c != null) {
+-            try {
+-                while (c.moveToNext()) {
+-                    updateThread(db, c.getInt(0));
++        db.beginTransaction();
++        try {
++            if (where == null) {
++                where = "";
++            } else {
++                where = "WHERE (" + where + ")";
++            }
++            String query = "SELECT _id FROM threads WHERE _id IN " +
++                           "(SELECT DISTINCT thread_id FROM sms " + where + ")";
++            Cursor c = db.rawQuery(query, whereArgs);
++            if (c != null) {
++                try {
++                    while (c.moveToNext()) {
++                        updateThread(db, c.getInt(0));
++                    }
++                } finally {
++                    c.close();
+                 }
+-            } finally {
+-                c.close();
+             }
++            // TODO: there are several db operations in this function. Lets wrap them in a
++            // transaction to make it faster.
++            // remove orphaned threads
++            db.delete(MmsSmsProvider.TABLE_THREADS,
++                    "_id NOT IN (SELECT DISTINCT thread_id FROM sms where thread_id NOT NULL " +
++                    "UNION SELECT DISTINCT thread_id FROM pdu where thread_id NOT NULL)", null);
++
++            // remove orphaned canonical_addresses
++            removeUnferencedCanonicalAddresses(db);
++
++            db.setTransactionSuccessful();
++        } catch (Throwable ex) {
++            Log.e(TAG, ex.getMessage(), ex);
++        } finally {
++            db.endTransaction();
+         }
+-        // TODO: there are several db operations in this function. Lets wrap them in a
+-        // transaction to make it faster.
+-        // remove orphaned threads
+-        db.delete("threads",
+-                "_id NOT IN (SELECT DISTINCT thread_id FROM sms where thread_id NOT NULL " +
+-                "UNION SELECT DISTINCT thread_id FROM pdu where thread_id NOT NULL)", null);
+-
+-        // remove orphaned canonical_addresses
+-        removeUnferencedCanonicalAddresses(db);
+     }
+ 
+     public static int deleteOneSms(SQLiteDatabase db, int message_id) {
+@@ -521,13 +538,6 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+             db.execSQL("CREATE TRIGGER sms_words_delete AFTER DELETE ON sms BEGIN DELETE FROM " +
+                     "  words WHERE source_id = OLD._id AND table_to_use = 1; END;");
+ 
+-            // monitor the mms table
+-            db.execSQL("CREATE TRIGGER mms_words_update AFTER UPDATE ON part BEGIN UPDATE words " +
+-                    " SET index_text = NEW.text WHERE (source_id=NEW._id AND table_to_use=2); " +
+-                    " END;");
+-            db.execSQL("CREATE TRIGGER mms_words_delete AFTER DELETE ON part BEGIN DELETE FROM " +
+-                    " words WHERE source_id = OLD._id AND table_to_use = 2; END;");
+-
+             populateWordsTable(db);
+         } catch (Exception ex) {
+             Log.e(TAG, "got exception creating words table: " + ex.toString());
+@@ -551,7 +561,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+         // N.B.: Whenever the columns here are changed, the columns in
+         // {@ref MmsSmsProvider} must be changed to match.
+         db.execSQL("CREATE TABLE " + MmsProvider.TABLE_PDU + " (" +
+-                   Mms._ID + " INTEGER PRIMARY KEY," +
++                   Mms._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    Mms.THREAD_ID + " INTEGER," +
+                    Mms.DATE + " INTEGER," +
+                    Mms.DATE_SENT + " INTEGER DEFAULT 0," +
+@@ -582,7 +592,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+                    Mms.DELIVERY_TIME + " INTEGER," +
+                    Mms.DELIVERY_REPORT + " INTEGER," +
+                    Mms.LOCKED + " INTEGER DEFAULT 0," +
+-                   Mms.SEEN + " INTEGER DEFAULT 0" +
++                   Mms.SEEN + " INTEGER DEFAULT 0," +
++                   Mms.TEXT_ONLY + " INTEGER DEFAULT 0" +
+                    ");");
+ 
+         db.execSQL("CREATE TABLE " + MmsProvider.TABLE_ADDR + " (" +
+@@ -594,7 +605,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+                    Addr.CHARSET + " INTEGER);");
+ 
+         db.execSQL("CREATE TABLE " + MmsProvider.TABLE_PART + " (" +
+-                   Part._ID + " INTEGER PRIMARY KEY," +
++                   Part._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    Part.MSG_ID + " INTEGER," +
+                    Part.SEQ + " INTEGER DEFAULT 0," +
+                    Part.CONTENT_TYPE + " TEXT," +
+@@ -617,40 +628,189 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+                    "_data TEXT);");
+     }
+ 
++    // Unlike the other trigger-creating functions, this function can be called multiple times
++    // without harm.
+     private void createMmsTriggers(SQLiteDatabase db) {
+         // Cleans up parts when a MM is deleted.
++        db.execSQL("DROP TRIGGER IF EXISTS part_cleanup");
+         db.execSQL("CREATE TRIGGER part_cleanup DELETE ON " + MmsProvider.TABLE_PDU + " " +
+-                   "BEGIN " +
+-                   "  DELETE FROM " + MmsProvider.TABLE_PART +
+-                   "  WHERE " + Part.MSG_ID + "=old._id;" +
+-                   "END;");
++                "BEGIN " +
++                "  DELETE FROM " + MmsProvider.TABLE_PART +
++                "  WHERE " + Part.MSG_ID + "=old._id;" +
++                "END;");
+ 
+         // Cleans up address info when a MM is deleted.
++        db.execSQL("DROP TRIGGER IF EXISTS addr_cleanup");
+         db.execSQL("CREATE TRIGGER addr_cleanup DELETE ON " + MmsProvider.TABLE_PDU + " " +
+-                   "BEGIN " +
+-                   "  DELETE FROM " + MmsProvider.TABLE_ADDR +
+-                   "  WHERE " + Addr.MSG_ID + "=old._id;" +
+-                   "END;");
++                "BEGIN " +
++                "  DELETE FROM " + MmsProvider.TABLE_ADDR +
++                "  WHERE " + Addr.MSG_ID + "=old._id;" +
++                "END;");
+ 
+         // Delete obsolete delivery-report, read-report while deleting their
+         // associated Send.req.
++        db.execSQL("DROP TRIGGER IF EXISTS cleanup_delivery_and_read_report");
+         db.execSQL("CREATE TRIGGER cleanup_delivery_and_read_report " +
+-                   "AFTER DELETE ON " + MmsProvider.TABLE_PDU + " " +
+-                   "WHEN old." + Mms.MESSAGE_TYPE + "=" + PduHeaders.MESSAGE_TYPE_SEND_REQ + " " +
+-                   "BEGIN " +
+-                   "  DELETE FROM " + MmsProvider.TABLE_PDU +
+-                   "  WHERE (" + Mms.MESSAGE_TYPE + "=" + PduHeaders.MESSAGE_TYPE_DELIVERY_IND +
+-                   "    OR " + Mms.MESSAGE_TYPE + "=" + PduHeaders.MESSAGE_TYPE_READ_ORIG_IND +
+-                   ")" +
+-                   "    AND " + Mms.MESSAGE_ID + "=old." + Mms.MESSAGE_ID + "; " +
+-                   "END;");
+-
+-        // Update threads table to indicate whether attachments exist when
+-        // parts are inserted or deleted.
++                "AFTER DELETE ON " + MmsProvider.TABLE_PDU + " " +
++                "WHEN old." + Mms.MESSAGE_TYPE + "=" + PduHeaders.MESSAGE_TYPE_SEND_REQ + " " +
++                "BEGIN " +
++                "  DELETE FROM " + MmsProvider.TABLE_PDU +
++                "  WHERE (" + Mms.MESSAGE_TYPE + "=" + PduHeaders.MESSAGE_TYPE_DELIVERY_IND +
++                "    OR " + Mms.MESSAGE_TYPE + "=" + PduHeaders.MESSAGE_TYPE_READ_ORIG_IND +
++                ")" +
++                "    AND " + Mms.MESSAGE_ID + "=old." + Mms.MESSAGE_ID + "; " +
++                "END;");
++
++        db.execSQL("DROP TRIGGER IF EXISTS update_threads_on_insert_part");
+         db.execSQL(PART_UPDATE_THREADS_ON_INSERT_TRIGGER);
++
++        db.execSQL("DROP TRIGGER IF EXISTS update_threads_on_update_part");
+         db.execSQL(PART_UPDATE_THREADS_ON_UPDATE_TRIGGER);
++
++        db.execSQL("DROP TRIGGER IF EXISTS update_threads_on_delete_part");
+         db.execSQL(PART_UPDATE_THREADS_ON_DELETE_TRIGGER);
++
++        db.execSQL("DROP TRIGGER IF EXISTS update_threads_on_update_pdu");
+         db.execSQL(PDU_UPDATE_THREADS_ON_UPDATE_TRIGGER);
++
++        // Delete pending status for a message when it is deleted.
++        db.execSQL("DROP TRIGGER IF EXISTS delete_mms_pending_on_delete");
++        db.execSQL("CREATE TRIGGER delete_mms_pending_on_delete " +
++                   "AFTER DELETE ON " + MmsProvider.TABLE_PDU + " " +
++                   "BEGIN " +
++                   "  DELETE FROM " + MmsSmsProvider.TABLE_PENDING_MSG +
++                   "  WHERE " + PendingMessages.MSG_ID + "=old._id; " +
++                   "END;");
++
++        // When a message is moved out of Outbox, delete its pending status.
++        db.execSQL("DROP TRIGGER IF EXISTS delete_mms_pending_on_update");
++        db.execSQL("CREATE TRIGGER delete_mms_pending_on_update " +
++                   "AFTER UPDATE ON " + MmsProvider.TABLE_PDU + " " +
++                   "WHEN old." + Mms.MESSAGE_BOX + "=" + Mms.MESSAGE_BOX_OUTBOX +
++                   "  AND new." + Mms.MESSAGE_BOX + "!=" + Mms.MESSAGE_BOX_OUTBOX + " " +
++                   "BEGIN " +
++                   "  DELETE FROM " + MmsSmsProvider.TABLE_PENDING_MSG +
++                   "  WHERE " + PendingMessages.MSG_ID + "=new._id; " +
++                   "END;");
++
++        // Insert pending status for M-Notification.ind or M-ReadRec.ind
++        // when they are inserted into Inbox/Outbox.
++        db.execSQL("DROP TRIGGER IF EXISTS insert_mms_pending_on_insert");
++        db.execSQL("CREATE TRIGGER insert_mms_pending_on_insert " +
++                   "AFTER INSERT ON pdu " +
++                   "WHEN new." + Mms.MESSAGE_TYPE + "=" + PduHeaders.MESSAGE_TYPE_NOTIFICATION_IND +
++                   "  OR new." + Mms.MESSAGE_TYPE + "=" + PduHeaders.MESSAGE_TYPE_READ_REC_IND +
++                   " " +
++                   "BEGIN " +
++                   "  INSERT INTO " + MmsSmsProvider.TABLE_PENDING_MSG +
++                   "    (" + PendingMessages.PROTO_TYPE + "," +
++                   "     " + PendingMessages.MSG_ID + "," +
++                   "     " + PendingMessages.MSG_TYPE + "," +
++                   "     " + PendingMessages.ERROR_TYPE + "," +
++                   "     " + PendingMessages.ERROR_CODE + "," +
++                   "     " + PendingMessages.RETRY_INDEX + "," +
++                   "     " + PendingMessages.DUE_TIME + ") " +
++                   "  VALUES " +
++                   "    (" + MmsSms.MMS_PROTO + "," +
++                   "      new." + BaseColumns._ID + "," +
++                   "      new." + Mms.MESSAGE_TYPE + ",0,0,0,0);" +
++                   "END;");
++
++
++        // Insert pending status for M-Send.req when it is moved into Outbox.
++        db.execSQL("DROP TRIGGER IF EXISTS insert_mms_pending_on_update");
++        db.execSQL("CREATE TRIGGER insert_mms_pending_on_update " +
++                   "AFTER UPDATE ON pdu " +
++                   "WHEN new." + Mms.MESSAGE_TYPE + "=" + PduHeaders.MESSAGE_TYPE_SEND_REQ +
++                   "  AND new." + Mms.MESSAGE_BOX + "=" + Mms.MESSAGE_BOX_OUTBOX +
++                   "  AND old." + Mms.MESSAGE_BOX + "!=" + Mms.MESSAGE_BOX_OUTBOX + " " +
++                   "BEGIN " +
++                   "  INSERT INTO " + MmsSmsProvider.TABLE_PENDING_MSG +
++                   "    (" + PendingMessages.PROTO_TYPE + "," +
++                   "     " + PendingMessages.MSG_ID + "," +
++                   "     " + PendingMessages.MSG_TYPE + "," +
++                   "     " + PendingMessages.ERROR_TYPE + "," +
++                   "     " + PendingMessages.ERROR_CODE + "," +
++                   "     " + PendingMessages.RETRY_INDEX + "," +
++                   "     " + PendingMessages.DUE_TIME + ") " +
++                   "  VALUES " +
++                   "    (" + MmsSms.MMS_PROTO + "," +
++                   "      new." + BaseColumns._ID + "," +
++                   "      new." + Mms.MESSAGE_TYPE + ",0,0,0,0);" +
++                   "END;");
++
++        // monitor the mms table
++        db.execSQL("DROP TRIGGER IF EXISTS mms_words_update");
++        db.execSQL("CREATE TRIGGER mms_words_update AFTER UPDATE ON part BEGIN UPDATE words " +
++                " SET index_text = NEW.text WHERE (source_id=NEW._id AND table_to_use=2); " +
++                " END;");
++
++        db.execSQL("DROP TRIGGER IF EXISTS mms_words_delete");
++        db.execSQL("CREATE TRIGGER mms_words_delete AFTER DELETE ON part BEGIN DELETE FROM " +
++                " words WHERE source_id = OLD._id AND table_to_use = 2; END;");
++
++        // Updates threads table whenever a message in pdu is updated.
++        db.execSQL("DROP TRIGGER IF EXISTS pdu_update_thread_date_subject_on_update");
++        db.execSQL("CREATE TRIGGER pdu_update_thread_date_subject_on_update AFTER" +
++                   "  UPDATE OF " + Mms.DATE + ", " + Mms.SUBJECT + ", " + Mms.MESSAGE_BOX +
++                   "  ON " + MmsProvider.TABLE_PDU + " " +
++                   PDU_UPDATE_THREAD_CONSTRAINTS +
++                   PDU_UPDATE_THREAD_DATE_SNIPPET_COUNT_ON_UPDATE);
++
++        // Update threads table whenever a message in pdu is deleted
++        db.execSQL("DROP TRIGGER IF EXISTS pdu_update_thread_on_delete");
++        db.execSQL("CREATE TRIGGER pdu_update_thread_on_delete " +
++                   "AFTER DELETE ON pdu " +
++                   "BEGIN " +
++                   "  UPDATE threads SET " +
++                   "     date = (strftime('%s','now') * 1000)" +
++                   "  WHERE threads._id = old." + Mms.THREAD_ID + "; " +
++                   UPDATE_THREAD_COUNT_ON_OLD +
++                   UPDATE_THREAD_SNIPPET_SNIPPET_CS_ON_DELETE +
++                   "END;");
++
++        // Updates threads table whenever a message is added to pdu.
++        db.execSQL("DROP TRIGGER IF EXISTS pdu_update_thread_on_insert");
++        db.execSQL("CREATE TRIGGER pdu_update_thread_on_insert AFTER INSERT ON " +
++                   MmsProvider.TABLE_PDU + " " +
++                   PDU_UPDATE_THREAD_CONSTRAINTS +
++                   PDU_UPDATE_THREAD_DATE_SNIPPET_COUNT_ON_UPDATE);
++
++        // Updates threads table whenever a message in pdu is updated.
++        db.execSQL("DROP TRIGGER IF EXISTS pdu_update_thread_read_on_update");
++        db.execSQL("CREATE TRIGGER pdu_update_thread_read_on_update AFTER" +
++                   "  UPDATE OF " + Mms.READ +
++                   "  ON " + MmsProvider.TABLE_PDU + " " +
++                   PDU_UPDATE_THREAD_CONSTRAINTS +
++                   "BEGIN " +
++                   PDU_UPDATE_THREAD_READ_BODY +
++                   "END;");
++
++        // Update the error flag of threads when delete pending message.
++        db.execSQL("DROP TRIGGER IF EXISTS update_threads_error_on_delete_mms");
++        db.execSQL("CREATE TRIGGER update_threads_error_on_delete_mms " +
++                   "  BEFORE DELETE ON pdu" +
++                   "  WHEN OLD._id IN (SELECT DISTINCT msg_id" +
++                   "                   FROM pending_msgs" +
++                   "                   WHERE err_type >= 10) " +
++                   "BEGIN " +
++                   "  UPDATE threads SET error = error - 1" +
++                   "  WHERE _id = OLD.thread_id; " +
++                   "END;");
++
++        // Update the error flag of threads while moving an MM out of Outbox,
++        // which was failed to be sent permanently.
++        db.execSQL("DROP TRIGGER IF EXISTS update_threads_error_on_move_mms");
++        db.execSQL("CREATE TRIGGER update_threads_error_on_move_mms " +
++                   "  BEFORE UPDATE OF msg_box ON pdu " +
++                   "  WHEN (OLD.msg_box = 4 AND NEW.msg_box != 4) " +
++                   "  AND (OLD._id IN (SELECT DISTINCT msg_id" +
++                   "                   FROM pending_msgs" +
++                   "                   WHERE err_type >= 10)) " +
++                   "BEGIN " +
++                   "  UPDATE threads SET error = error - 1" +
++                   "  WHERE _id = OLD.thread_id; " +
++                   "END;");
+     }
+ 
+     private void createSmsTables(SQLiteDatabase db) {
+@@ -763,38 +923,16 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+ 
+     // TODO Check the query plans for these triggers.
+     private void createCommonTriggers(SQLiteDatabase db) {
+-        // Updates threads table whenever a message is added to pdu.
+-        db.execSQL("CREATE TRIGGER pdu_update_thread_on_insert AFTER INSERT ON " +
+-                   MmsProvider.TABLE_PDU + " " +
+-                   PDU_UPDATE_THREAD_CONSTRAINTS +
+-                   PDU_UPDATE_THREAD_DATE_SNIPPET_COUNT_ON_UPDATE);
+-
+         // Updates threads table whenever a message is added to sms.
+         db.execSQL("CREATE TRIGGER sms_update_thread_on_insert AFTER INSERT ON sms " +
+                    SMS_UPDATE_THREAD_DATE_SNIPPET_COUNT_ON_UPDATE);
+ 
+-        // Updates threads table whenever a message in pdu is updated.
+-        db.execSQL("CREATE TRIGGER pdu_update_thread_date_subject_on_update AFTER" +
+-                   "  UPDATE OF " + Mms.DATE + ", " + Mms.SUBJECT + ", " + Mms.MESSAGE_BOX +
+-                   "  ON " + MmsProvider.TABLE_PDU + " " +
+-                   PDU_UPDATE_THREAD_CONSTRAINTS +
+-                   PDU_UPDATE_THREAD_DATE_SNIPPET_COUNT_ON_UPDATE);
+-
+         // Updates threads table whenever a message in sms is updated.
+         db.execSQL("CREATE TRIGGER sms_update_thread_date_subject_on_update AFTER" +
+                    "  UPDATE OF " + Sms.DATE + ", " + Sms.BODY + ", " + Sms.TYPE +
+                    "  ON sms " +
+                    SMS_UPDATE_THREAD_DATE_SNIPPET_COUNT_ON_UPDATE);
+ 
+-        // Updates threads table whenever a message in pdu is updated.
+-        db.execSQL("CREATE TRIGGER pdu_update_thread_read_on_update AFTER" +
+-                   "  UPDATE OF " + Mms.READ +
+-                   "  ON " + MmsProvider.TABLE_PDU + " " +
+-                   PDU_UPDATE_THREAD_CONSTRAINTS +
+-                   "BEGIN " +
+-                   PDU_UPDATE_THREAD_READ_BODY +
+-                   "END;");
+-
+         // Updates threads table whenever a message in sms is updated.
+         db.execSQL("CREATE TRIGGER sms_update_thread_read_on_update AFTER" +
+                    "  UPDATE OF " + Sms.READ +
+@@ -803,17 +941,6 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+                    SMS_UPDATE_THREAD_READ_BODY +
+                    "END;");
+ 
+-        // Update threads table whenever a message in pdu is deleted
+-        db.execSQL("CREATE TRIGGER pdu_update_thread_on_delete " +
+-                   "AFTER DELETE ON pdu " +
+-                   "BEGIN " +
+-                   "  UPDATE threads SET " +
+-                   "     date = (strftime('%s','now') * 1000)" +
+-                   "  WHERE threads._id = old." + Mms.THREAD_ID + "; " +
+-                   UPDATE_THREAD_COUNT_ON_OLD +
+-                   UPDATE_THREAD_SNIPPET_SNIPPET_CS_ON_DELETE +
+-                   "END;");
+-
+         // As of DATABASE_VERSION 55, we've removed these triggers that delete empty threads.
+         // These triggers interfere with saving drafts on brand new threads. Instead of
+         // triggers cleaning up empty threads, the empty threads should be cleaned up by
+@@ -845,67 +972,6 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+ //                   "     UNION SELECT thread_id from pdu); " +
+ //                   "END;");
+ 
+-        // Insert pending status for M-Notification.ind or M-ReadRec.ind
+-        // when they are inserted into Inbox/Outbox.
+-        db.execSQL("CREATE TRIGGER insert_mms_pending_on_insert " +
+-                   "AFTER INSERT ON pdu " +
+-                   "WHEN new." + Mms.MESSAGE_TYPE + "=" + PduHeaders.MESSAGE_TYPE_NOTIFICATION_IND +
+-                   "  OR new." + Mms.MESSAGE_TYPE + "=" + PduHeaders.MESSAGE_TYPE_READ_REC_IND +
+-                   " " +
+-                   "BEGIN " +
+-                   "  INSERT INTO " + MmsSmsProvider.TABLE_PENDING_MSG +
+-                   "    (" + PendingMessages.PROTO_TYPE + "," +
+-                   "     " + PendingMessages.MSG_ID + "," +
+-                   "     " + PendingMessages.MSG_TYPE + "," +
+-                   "     " + PendingMessages.ERROR_TYPE + "," +
+-                   "     " + PendingMessages.ERROR_CODE + "," +
+-                   "     " + PendingMessages.RETRY_INDEX + "," +
+-                   "     " + PendingMessages.DUE_TIME + ") " +
+-                   "  VALUES " +
+-                   "    (" + MmsSms.MMS_PROTO + "," +
+-                   "      new." + BaseColumns._ID + "," +
+-                   "      new." + Mms.MESSAGE_TYPE + ",0,0,0,0);" +
+-                   "END;");
+-
+-        // Insert pending status for M-Send.req when it is moved into Outbox.
+-        db.execSQL("CREATE TRIGGER insert_mms_pending_on_update " +
+-                   "AFTER UPDATE ON pdu " +
+-                   "WHEN new." + Mms.MESSAGE_TYPE + "=" + PduHeaders.MESSAGE_TYPE_SEND_REQ +
+-                   "  AND new." + Mms.MESSAGE_BOX + "=" + Mms.MESSAGE_BOX_OUTBOX +
+-                   "  AND old." + Mms.MESSAGE_BOX + "!=" + Mms.MESSAGE_BOX_OUTBOX + " " +
+-                   "BEGIN " +
+-                   "  INSERT INTO " + MmsSmsProvider.TABLE_PENDING_MSG +
+-                   "    (" + PendingMessages.PROTO_TYPE + "," +
+-                   "     " + PendingMessages.MSG_ID + "," +
+-                   "     " + PendingMessages.MSG_TYPE + "," +
+-                   "     " + PendingMessages.ERROR_TYPE + "," +
+-                   "     " + PendingMessages.ERROR_CODE + "," +
+-                   "     " + PendingMessages.RETRY_INDEX + "," +
+-                   "     " + PendingMessages.DUE_TIME + ") " +
+-                   "  VALUES " +
+-                   "    (" + MmsSms.MMS_PROTO + "," +
+-                   "      new." + BaseColumns._ID + "," +
+-                   "      new." + Mms.MESSAGE_TYPE + ",0,0,0,0);" +
+-                   "END;");
+-
+-        // When a message is moved out of Outbox, delete its pending status.
+-        db.execSQL("CREATE TRIGGER delete_mms_pending_on_update " +
+-                   "AFTER UPDATE ON " + MmsProvider.TABLE_PDU + " " +
+-                   "WHEN old." + Mms.MESSAGE_BOX + "=" + Mms.MESSAGE_BOX_OUTBOX +
+-                   "  AND new." + Mms.MESSAGE_BOX + "!=" + Mms.MESSAGE_BOX_OUTBOX + " " +
+-                   "BEGIN " +
+-                   "  DELETE FROM " + MmsSmsProvider.TABLE_PENDING_MSG +
+-                   "  WHERE " + PendingMessages.MSG_ID + "=new._id; " +
+-                   "END;");
+-
+-        // Delete pending status for a message when it is deleted.
+-        db.execSQL("CREATE TRIGGER delete_mms_pending_on_delete " +
+-                   "AFTER DELETE ON " + MmsProvider.TABLE_PDU + " " +
+-                   "BEGIN " +
+-                   "  DELETE FROM " + MmsSmsProvider.TABLE_PENDING_MSG +
+-                   "  WHERE " + PendingMessages.MSG_ID + "=old._id; " +
+-                   "END;");
+-
+         // TODO Add triggers for SMS retry-status management.
+ 
+         // Update the error flag of threads when the error type of
+@@ -926,30 +992,6 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+                    "    WHERE _id = NEW.msg_id); " +
+                    "END;");
+ 
+-        // Update the error flag of threads when delete pending message.
+-        db.execSQL("CREATE TRIGGER update_threads_error_on_delete_mms " +
+-                   "  BEFORE DELETE ON pdu" +
+-                   "  WHEN OLD._id IN (SELECT DISTINCT msg_id" +
+-                   "                   FROM pending_msgs" +
+-                   "                   WHERE err_type >= 10) " +
+-                   "BEGIN " +
+-                   "  UPDATE threads SET error = error - 1" +
+-                   "  WHERE _id = OLD.thread_id; " +
+-                   "END;");
+-
+-        // Update the error flag of threads while moving an MM out of Outbox,
+-        // which was failed to be sent permanently.
+-        db.execSQL("CREATE TRIGGER update_threads_error_on_move_mms " +
+-                   "  BEFORE UPDATE OF msg_box ON pdu " +
+-                   "  WHEN (OLD.msg_box = 4 AND NEW.msg_box != 4) " +
+-                   "  AND (OLD._id IN (SELECT DISTINCT msg_id" +
+-                   "                   FROM pending_msgs" +
+-                   "                   WHERE err_type >= 10)) " +
+-                   "BEGIN " +
+-                   "  UPDATE threads SET error = error - 1" +
+-                   "  WHERE _id = OLD.thread_id; " +
+-                   "END;");
+-
+         // Update the error flag of threads after a text message was
+         // failed to send/receive.
+         db.execSQL("CREATE TRIGGER update_threads_error_on_update_sms " +
+@@ -1199,6 +1241,38 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+             } finally {
+                 db.endTransaction();
+             }
++            // fall through
++        case 55:
++            if (currentVersion <= 55) {
++                return;
++            }
++
++            db.beginTransaction();
++            try {
++                upgradeDatabaseToVersion56(db);
++                db.setTransactionSuccessful();
++            } catch (Throwable ex) {
++                Log.e(TAG, ex.getMessage(), ex);
++                break;
++            } finally {
++                db.endTransaction();
++            }
++            // fall through
++        case 56:
++            if (currentVersion <= 56) {
++                return;
++            }
++
++            db.beginTransaction();
++            try {
++                upgradeDatabaseToVersion57(db);
++                db.setTransactionSuccessful();
++            } catch (Throwable ex) {
++                Log.e(TAG, ex.getMessage(), ex);
++                break;
++            } finally {
++                db.endTransaction();
++            }
+             return;
+         }
+ 
+@@ -1389,18 +1463,35 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+         db.execSQL("DROP TRIGGER IF EXISTS delete_obsolete_threads_when_update_pdu");
+     }
+ 
++    private void upgradeDatabaseToVersion56(SQLiteDatabase db) {
++        // Add 'text_only' column to pdu table.
++        db.execSQL("ALTER TABLE " + MmsProvider.TABLE_PDU + " ADD COLUMN " + Mms.TEXT_ONLY +
++                " INTEGER DEFAULT 0");
++    }
++
++    private void upgradeDatabaseToVersion57(SQLiteDatabase db) {
++        // Clear out bad rows, those with empty threadIds, from the pdu table.
++        db.execSQL("DELETE FROM " + MmsProvider.TABLE_PDU + " WHERE " + Mms.THREAD_ID + " IS NULL");
++    }
++
+     @Override
+     public synchronized SQLiteDatabase getWritableDatabase() {
+         SQLiteDatabase db = super.getWritableDatabase();
+ 
+         if (!sTriedAutoIncrement) {
+             sTriedAutoIncrement = true;
+-            boolean hasAutoIncrementThreads = hasAutoIncrement(db, "threads");
++            boolean hasAutoIncrementThreads = hasAutoIncrement(db, MmsSmsProvider.TABLE_THREADS);
+             boolean hasAutoIncrementAddresses = hasAutoIncrement(db, "canonical_addresses");
++            boolean hasAutoIncrementPart = hasAutoIncrement(db, "part");
++            boolean hasAutoIncrementPdu = hasAutoIncrement(db, "pdu");
+             Log.d(TAG, "[getWritableDatabase] hasAutoIncrementThreads: " + hasAutoIncrementThreads +
+-                    " hasAutoIncrementAddresses: " + hasAutoIncrementAddresses);
++                    " hasAutoIncrementAddresses: " + hasAutoIncrementAddresses +
++                    " hasAutoIncrementPart: " + hasAutoIncrementPart +
++                    " hasAutoIncrementPdu: " + hasAutoIncrementPdu);
+             boolean autoIncrementThreadsSuccess = true;
+             boolean autoIncrementAddressesSuccess = true;
++            boolean autoIncrementPartSuccess = true;
++            boolean autoIncrementPduSuccess = true;
+             if (!hasAutoIncrementThreads) {
+                 db.beginTransaction();
+                 try {
+@@ -1436,7 +1527,46 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+                     db.endTransaction();
+                 }
+             }
+-            if (autoIncrementThreadsSuccess && autoIncrementAddressesSuccess) {
++            if (!hasAutoIncrementPart) {
++                db.beginTransaction();
++                try {
++                    if (false && sFakeLowStorageTest) {
++                        Log.d(TAG, "[getWritableDatabase] mFakeLowStorageTest is true " +
++                        " - fake exception");
++                        throw new Exception("FakeLowStorageTest");
++                    }
++                    upgradePartTableToAutoIncrement(db);     // a no-op if already upgraded
++                    db.setTransactionSuccessful();
++                } catch (Throwable ex) {
++                    Log.e(TAG, "Failed to add autoIncrement to part: " +
++                            ex.getMessage(), ex);
++                    autoIncrementPartSuccess = false;
++                } finally {
++                    db.endTransaction();
++                }
++            }
++            if (!hasAutoIncrementPdu) {
++                db.beginTransaction();
++                try {
++                    if (false && sFakeLowStorageTest) {
++                        Log.d(TAG, "[getWritableDatabase] mFakeLowStorageTest is true " +
++                        " - fake exception");
++                        throw new Exception("FakeLowStorageTest");
++                    }
++                    upgradePduTableToAutoIncrement(db);     // a no-op if already upgraded
++                    db.setTransactionSuccessful();
++                } catch (Throwable ex) {
++                    Log.e(TAG, "Failed to add autoIncrement to pdu: " +
++                            ex.getMessage(), ex);
++                    autoIncrementPduSuccess = false;
++                } finally {
++                    db.endTransaction();
++                }
++            }
++            if (autoIncrementThreadsSuccess &&
++                    autoIncrementAddressesSuccess &&
++                    autoIncrementPartSuccess &&
++                    autoIncrementPduSuccess) {
+                 if (mLowStorageMonitor != null) {
+                     // We've already updated the database. This receiver is no longer necessary.
+                     Log.d(TAG, "Unregistering mLowStorageMonitor - we've upgraded");
+@@ -1489,7 +1619,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+     // storage to make a copy of the threads table. That's ok. This upgrade is optional. It'll
+     // be called again next time the device is rebooted.
+     private void upgradeThreadsTableToAutoIncrement(SQLiteDatabase db) {
+-        if (hasAutoIncrement(db, "threads")) {
++        if (hasAutoIncrement(db, MmsSmsProvider.TABLE_THREADS)) {
+             Log.d(TAG, "[MmsSmsDb] upgradeThreadsTableToAutoIncrement: already upgraded");
+             return;
+         }
+@@ -1537,6 +1667,102 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
+         db.execSQL("ALTER TABLE canonical_addresses_temp RENAME TO canonical_addresses;");
+     }
+ 
++    // upgradePartTableToAutoIncrement() is called to add the AUTOINCREMENT keyword to
++    // the part table. This could fail if the user has a lot of sound/video/picture attachments
++    // and not enough storage to make a copy of the part table.
++    // That's ok. This upgrade is optional. It'll be called again next time the device is rebooted.
++    private void upgradePartTableToAutoIncrement(SQLiteDatabase db) {
++        if (hasAutoIncrement(db, "part")) {
++            Log.d(TAG, "[MmsSmsDb] upgradePartTableToAutoIncrement: already upgraded");
++            return;
++        }
++        Log.d(TAG, "[MmsSmsDb] upgradePartTableToAutoIncrement: upgrading");
++
++        // Make the _id of the part table autoincrement so we never re-use ids
++        // Have to create a new temp part table. Copy all the info from the old
++        // table. Drop the old table and rename the new table to that of the old.
++        db.execSQL("CREATE TABLE part_temp (" +
++                Part._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
++                Part.MSG_ID + " INTEGER," +
++                Part.SEQ + " INTEGER DEFAULT 0," +
++                Part.CONTENT_TYPE + " TEXT," +
++                Part.NAME + " TEXT," +
++                Part.CHARSET + " INTEGER," +
++                Part.CONTENT_DISPOSITION + " TEXT," +
++                Part.FILENAME + " TEXT," +
++                Part.CONTENT_ID + " TEXT," +
++                Part.CONTENT_LOCATION + " TEXT," +
++                Part.CT_START + " INTEGER," +
++                Part.CT_TYPE + " TEXT," +
++                Part._DATA + " TEXT," +
++                Part.TEXT + " TEXT);");
++
++        db.execSQL("INSERT INTO part_temp SELECT * from part;");
++        db.execSQL("DROP TABLE part;");
++        db.execSQL("ALTER TABLE part_temp RENAME TO part;");
++
++        // part-related triggers get tossed when the part table is dropped -- rebuild them.
++        createMmsTriggers(db);
++    }
++
++    // upgradePduTableToAutoIncrement() is called to add the AUTOINCREMENT keyword to
++    // the pdu table. This could fail if the user has a lot of mms messages
++    // and not enough storage to make a copy of the pdu table.
++    // That's ok. This upgrade is optional. It'll be called again next time the device is rebooted.
++    private void upgradePduTableToAutoIncrement(SQLiteDatabase db) {
++        if (hasAutoIncrement(db, "pdu")) {
++            Log.d(TAG, "[MmsSmsDb] upgradePduTableToAutoIncrement: already upgraded");
++            return;
++        }
++        Log.d(TAG, "[MmsSmsDb] upgradePduTableToAutoIncrement: upgrading");
++
++        // Make the _id of the part table autoincrement so we never re-use ids
++        // Have to create a new temp part table. Copy all the info from the old
++        // table. Drop the old table and rename the new table to that of the old.
++        db.execSQL("CREATE TABLE pdu_temp (" +
++                Mms._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
++                Mms.THREAD_ID + " INTEGER," +
++                Mms.DATE + " INTEGER," +
++                Mms.DATE_SENT + " INTEGER DEFAULT 0," +
++                Mms.MESSAGE_BOX + " INTEGER," +
++                Mms.READ + " INTEGER DEFAULT 0," +
++                Mms.MESSAGE_ID + " TEXT," +
++                Mms.SUBJECT + " TEXT," +
++                Mms.SUBJECT_CHARSET + " INTEGER," +
++                Mms.CONTENT_TYPE + " TEXT," +
++                Mms.CONTENT_LOCATION + " TEXT," +
++                Mms.EXPIRY + " INTEGER," +
++                Mms.MESSAGE_CLASS + " TEXT," +
++                Mms.MESSAGE_TYPE + " INTEGER," +
++                Mms.MMS_VERSION + " INTEGER," +
++                Mms.MESSAGE_SIZE + " INTEGER," +
++                Mms.PRIORITY + " INTEGER," +
++                Mms.READ_REPORT + " INTEGER," +
++                Mms.REPORT_ALLOWED + " INTEGER," +
++                Mms.RESPONSE_STATUS + " INTEGER," +
++                Mms.STATUS + " INTEGER," +
++                Mms.TRANSACTION_ID + " TEXT," +
++                Mms.RETRIEVE_STATUS + " INTEGER," +
++                Mms.RETRIEVE_TEXT + " TEXT," +
++                Mms.RETRIEVE_TEXT_CHARSET + " INTEGER," +
++                Mms.READ_STATUS + " INTEGER," +
++                Mms.CONTENT_CLASS + " INTEGER," +
++                Mms.RESPONSE_TEXT + " TEXT," +
++                Mms.DELIVERY_TIME + " INTEGER," +
++                Mms.DELIVERY_REPORT + " INTEGER," +
++                Mms.LOCKED + " INTEGER DEFAULT 0," +
++                Mms.SEEN + " INTEGER DEFAULT 0," +
++                Mms.TEXT_ONLY + " INTEGER DEFAULT 0" +
++                ");");
++
++        db.execSQL("INSERT INTO pdu_temp SELECT * from pdu;");
++        db.execSQL("DROP TABLE pdu;");
++        db.execSQL("ALTER TABLE pdu_temp RENAME TO pdu;");
++
++        // pdu-related triggers get tossed when the part table is dropped -- rebuild them.
++        createMmsTriggers(db);
++    }
++
+     private class LowStorageMonitor extends BroadcastReceiver {
+ 
+         public LowStorageMonitor() {
+diff --git a/src/com/android/providers/telephony/MmsSmsProvider.java b/src/com/android/providers/telephony/MmsSmsProvider.java
+index fb082b9..ea0e39e 100644
+--- a/src/com/android/providers/telephony/MmsSmsProvider.java
++++ b/src/com/android/providers/telephony/MmsSmsProvider.java
+@@ -21,6 +21,7 @@ import java.util.HashSet;
+ import java.util.List;
+ import java.util.Set;
+ 
++import android.app.AppOpsManager;
+ import android.content.ContentProvider;
+ import android.content.ContentValues;
+ import android.content.Context;
+@@ -105,6 +106,11 @@ public class MmsSmsProvider extends ContentProvider {
+      */
+     private static final String TABLE_CANONICAL_ADDRESSES = "canonical_addresses";
+ 
++    /**
++     * the name of the table that is used to store the conversation threads.
++     */
++    static final String TABLE_THREADS = "threads";
++
+     // These constants are used to construct union queries across the
+     // MMS and SMS base tables.
+ 
+@@ -122,7 +128,7 @@ public class MmsSmsProvider extends ContentProvider {
+         Mms.READ_STATUS, Mms.RESPONSE_STATUS, Mms.RESPONSE_TEXT,
+         Mms.RETRIEVE_STATUS, Mms.RETRIEVE_TEXT_CHARSET, Mms.REPORT_ALLOWED,
+         Mms.READ_REPORT, Mms.STATUS, Mms.SUBJECT, Mms.SUBJECT_CHARSET,
+-        Mms.TRANSACTION_ID, Mms.MMS_VERSION };
++        Mms.TRANSACTION_ID, Mms.MMS_VERSION, Mms.TEXT_ONLY };
+ 
+     // These are the columns that appear only in the SMS message
+     // table.
+@@ -277,6 +283,7 @@ public class MmsSmsProvider extends ContentProvider {
+ 
+     @Override
+     public boolean onCreate() {
++        setAppOps(AppOpsManager.OP_READ_SMS, AppOpsManager.OP_WRITE_SMS);
+         mOpenHelper = MmsSmsDatabaseHelper.getInstance(getContext());
+         mUseStrictPhoneNumberComparation =
+             getContext().getResources().getBoolean(
+@@ -598,7 +605,7 @@ public class MmsSmsProvider extends ContentProvider {
+         }
+         values.put(ThreadsColumns.MESSAGE_COUNT, 0);
+ 
+-        long result = mOpenHelper.getWritableDatabase().insert("threads", null, values);
++        long result = mOpenHelper.getWritableDatabase().insert(TABLE_THREADS, null, values);
+         Log.d(LOG_TAG, "insertThread: created new thread_id " + result +
+                 " for recipientIds " + /*recipientIds*/ "xxxxxxx");
+ 
+@@ -637,24 +644,35 @@ public class MmsSmsProvider extends ContentProvider {
+         }
+ 
+         String[] selectionArgs = new String[] { recipientIds };
++
+         SQLiteDatabase db = mOpenHelper.getReadableDatabase();
+-        Cursor cursor = db.rawQuery(THREAD_QUERY, selectionArgs);
++        db.beginTransaction();
++        Cursor cursor = null;
++        try {
++            // Find the thread with the given recipients
++            cursor = db.rawQuery(THREAD_QUERY, selectionArgs);
+ 
+-        if (cursor.getCount() == 0) {
+-            cursor.close();
++            if (cursor.getCount() == 0) {
++                // No thread with those recipients exists, so create the thread.
++                cursor.close();
+ 
+-            Log.d(LOG_TAG, "getThreadId: create new thread_id for recipients " +
+-                    /*recipients*/ "xxxxxxxx");
+-            insertThread(recipientIds, recipients.size());
++                Log.d(LOG_TAG, "getThreadId: create new thread_id for recipients " +
++                        /*recipients*/ "xxxxxxxx");
++                insertThread(recipientIds, recipients.size());
+ 
+-            db = mOpenHelper.getReadableDatabase();  // In case insertThread closed it
+-            cursor = db.rawQuery(THREAD_QUERY, selectionArgs);
++                // The thread was just created, now find it and return it.
++                cursor = db.rawQuery(THREAD_QUERY, selectionArgs);
++            }
++            db.setTransactionSuccessful();
++        } catch (Throwable ex) {
++            Log.e(LOG_TAG, ex.getMessage(), ex);
++        } finally {
++            db.endTransaction();
+         }
+ 
+-        if (cursor.getCount() > 1) {
++        if (cursor != null && cursor.getCount() > 1) {
+             Log.w(LOG_TAG, "getThreadId: why is cursorCount=" + cursor.getCount());
+         }
+-
+         return cursor;
+     }
+ 
+@@ -700,7 +718,7 @@ public class MmsSmsProvider extends ContentProvider {
+      */
+     private Cursor getSimpleConversations(String[] projection, String selection,
+             String[] selectionArgs, String sortOrder) {
+-        return mOpenHelper.getReadableDatabase().query("threads", projection,
++        return mOpenHelper.getReadableDatabase().query(TABLE_THREADS, projection,
+                 selection, selectionArgs, null, null, " date DESC");
+     }
+ 
+@@ -1005,7 +1023,7 @@ public class MmsSmsProvider extends ContentProvider {
+         String[] columns = handleNullThreadsProjection(projection);
+ 
+         queryBuilder.setDistinct(true);
+-        queryBuilder.setTables("threads");
++        queryBuilder.setTables(TABLE_THREADS);
+         return queryBuilder.query(
+                 mOpenHelper.getReadableDatabase(), columns, finalSelection,
+                 selectionArgs, sortOrder, null, null);
+@@ -1177,7 +1195,7 @@ public class MmsSmsProvider extends ContentProvider {
+                 MmsSmsDatabaseHelper.updateAllThreads(db, null, null);
+                 break;
+             case URI_OBSOLETE_THREADS:
+-                affectedRows = db.delete("threads",
++                affectedRows = db.delete(TABLE_THREADS,
+                         "_id NOT IN (SELECT DISTINCT thread_id FROM sms where thread_id NOT NULL " +
+                         "UNION SELECT DISTINCT thread_id FROM pdu where thread_id NOT NULL)", null);
+                 break;
+diff --git a/src/com/android/providers/telephony/SmsProvider.java b/src/com/android/providers/telephony/SmsProvider.java
+index 15e008d..3538525 100644
+--- a/src/com/android/providers/telephony/SmsProvider.java
++++ b/src/com/android/providers/telephony/SmsProvider.java
+@@ -16,6 +16,7 @@
+ 
+ package com.android.providers.telephony;
+ 
++import android.app.AppOpsManager;
+ import android.content.ContentProvider;
+ import android.content.ContentResolver;
+ import android.content.ContentValues;
+@@ -82,6 +83,7 @@ public class SmsProvider extends ContentProvider {
+ 
+     @Override
+     public boolean onCreate() {
++        setAppOps(AppOpsManager.OP_READ_SMS, AppOpsManager.OP_WRITE_SMS);
+         mOpenHelper = MmsSmsDatabaseHelper.getInstance(getContext());
+         return true;
+     }
+diff --git a/src/com/android/providers/telephony/TelephonyProvider.java b/src/com/android/providers/telephony/TelephonyProvider.java
+old mode 100755
+new mode 100644
+index 79d6a95..f68ac51
+--- a/src/com/android/providers/telephony/TelephonyProvider.java
++++ b/src/com/android/providers/telephony/TelephonyProvider.java
+@@ -26,6 +26,7 @@ import android.content.UriMatcher;
+ import android.content.res.Resources;
+ import android.content.res.XmlResourceParser;
+ import android.database.Cursor;
++import android.database.SQLException;
+ import android.database.sqlite.SQLiteDatabase;
+ import android.database.sqlite.SQLiteOpenHelper;
+ import android.database.sqlite.SQLiteQueryBuilder;
+@@ -33,11 +34,13 @@ import android.net.Uri;
+ import android.os.Environment;
+ import android.os.FileUtils;
+ import android.provider.Telephony;
++import android.telephony.TelephonyManager;
+ import android.util.Log;
+ import android.util.Xml;
+ 
+ import com.android.internal.telephony.BaseCommands;
+ import com.android.internal.telephony.Phone;
++import com.android.internal.telephony.PhoneConstants;
+ import com.android.internal.util.XmlUtils;
+ 
+ import org.xmlpull.v1.XmlPullParser;
+@@ -54,7 +57,7 @@ public class TelephonyProvider extends ContentProvider
+     private static final String DATABASE_NAME = "telephony.db";
+     private static final boolean DBG = true;
+ 
+-    private static final int DATABASE_VERSION = 7 << 16;
++    private static final int DATABASE_VERSION = 8 << 16;
+     private static final int URL_TELEPHONY = 1;
+     private static final int URL_CURRENT = 2;
+     private static final int URL_ID = 3;
+@@ -145,7 +148,9 @@ public class TelephonyProvider extends ContentProvider
+                     "protocol TEXT," +
+                     "roaming_protocol TEXT," +
+                     "carrier_enabled BOOLEAN," +
+-                    "bearer INTEGER);");
++                    "bearer INTEGER," +
++                    "mvno_type TEXT," +
++                    "mvno_match_data TEXT);");
+ 
+             initDatabase(db);
+         }
+@@ -165,7 +170,7 @@ public class TelephonyProvider extends ContentProvider
+                 parser.close();
+             }
+ 
+-           // Read external APNS data (partner-provided)
++            // Read external APNS data (partner-provided)
+             XmlPullParser confparser = null;
+             // Environment.getRootDirectory() is a fancy way of saying ANDROID_ROOT or "/system".
+             File confFile = new File(Environment.getRootDirectory(), PARTNER_APNS_PATH);
+@@ -223,13 +228,22 @@ public class TelephonyProvider extends ContentProvider
+                 oldVersion = 6 << 16 | 6;
+             }
+             if (oldVersion < (7 << 16 | 6)) {
+-                // Add protcol fields to the APN. The XML file does not change.
++                // Add carrier_enabled, bearer fields to the APN. The XML file does not change.
+                 db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                         " ADD COLUMN carrier_enabled BOOLEAN DEFAULT 1;");
+                 db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                         " ADD COLUMN bearer INTEGER DEFAULT 0;");
+                 oldVersion = 7 << 16 | 6;
+             }
++            if (oldVersion < (8 << 16 | 6)) {
++                // Add mvno_type, mvno_match_data fields to the APN.
++                // The XML file does not change.
++                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
++                        " ADD COLUMN mvno_type TEXT DEFAULT '';");
++                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
++                        " ADD COLUMN mvno_match_data TEXT DEFAULT '';");
++                oldVersion = 8 << 16 | 6;
++            }
+         }
+ 
+         /**
+@@ -305,6 +319,15 @@ public class TelephonyProvider extends ContentProvider
+             if (bearer != null) {
+                 map.put(Telephony.Carriers.BEARER, Integer.parseInt(bearer));
+             }
++
++            String mvno_type = parser.getAttributeValue(null, "mvno_type");
++            if (mvno_type != null) {
++                String mvno_match_data = parser.getAttributeValue(null, "mvno_match_data");
++                if (mvno_match_data != null) {
++                    map.put(Telephony.Carriers.MVNO_TYPE, mvno_type);
++                    map.put(Telephony.Carriers.MVNO_MATCH_DATA, mvno_match_data);
++                }
++            }
+             return map;
+         }
+ 
+@@ -318,19 +341,25 @@ public class TelephonyProvider extends ContentProvider
+         private void loadApns(SQLiteDatabase db, XmlPullParser parser) {
+             if (parser != null) {
+                 try {
+-                    while (true) {
+-                        XmlUtils.nextElement(parser);
++                    db.beginTransaction();
++                    XmlUtils.nextElement(parser);
++                    while (parser.getEventType() != XmlPullParser.END_DOCUMENT) {
+                         ContentValues row = getRow(parser);
+-                        if (row != null) {
+-                            insertAddingDefaults(db, CARRIERS_TABLE, row);
+-                        } else {
+-                            break;  // do we really want to skip the rest of the file?
++                        if (row == null) {
++                            throw new XmlPullParserException("Expected 'apn' tag", parser, null);
+                         }
++                        insertAddingDefaults(db, CARRIERS_TABLE, row);
++                        XmlUtils.nextElement(parser);
+                     }
+-                } catch (XmlPullParserException e)  {
+-                    Log.e(TAG, "Got execption while getting perferred time zone.", e);
++                    db.setTransactionSuccessful();
++                } catch (XmlPullParserException e) {
++                    Log.e(TAG, "Got XmlPullParserException while loading apns.", e);
+                 } catch (IOException e) {
+-                    Log.e(TAG, "Got execption while getting perferred time zone.", e);
++                    Log.e(TAG, "Got IOException while loading apns.", e);
++                } catch (SQLException e) {
++                    Log.e(TAG, "Got SQLException while loading apns.", e);
++                } finally {
++                    db.endTransaction();
+                 }
+             }
+         }
+@@ -352,6 +381,12 @@ public class TelephonyProvider extends ContentProvider
+             if (row.containsKey(Telephony.Carriers.BEARER) == false) {
+                 row.put(Telephony.Carriers.BEARER, 0);
+             }
++            if (row.containsKey(Telephony.Carriers.MVNO_TYPE) == false) {
++                row.put(Telephony.Carriers.MVNO_TYPE, "");
++            }
++            if (row.containsKey(Telephony.Carriers.MVNO_MATCH_DATA) == false) {
++                row.put(Telephony.Carriers.MVNO_MATCH_DATA, "");
++            }
+             db.insert(CARRIERS_TABLE, null, row);
+         }
+     }
+@@ -393,7 +428,7 @@ public class TelephonyProvider extends ContentProvider
+     }
+ 
+     private boolean isLteOnCdma() {
+-        return BaseCommands.getLteOnCdmaModeStatic() == Phone.LTE_ON_CDMA_TRUE;
++        return TelephonyManager.getLteOnCdmaModeStatic() == PhoneConstants.LTE_ON_CDMA_TRUE;
+     }
+ 
+     private void setPreferredApnId(Long id) {
+@@ -424,6 +459,7 @@ public class TelephonyProvider extends ContentProvider
+     public Cursor query(Uri url, String[] projectionIn, String selection,
+             String[] selectionArgs, String sort) {
+         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
++        qb.setStrict(true); // a little protection from injection attacks
+         qb.setTables("carriers");
+ 
+         int match = s_urlMatcher.match(url);
+@@ -457,9 +493,33 @@ public class TelephonyProvider extends ContentProvider
+             }
+         }
+ 
++        if (projectionIn != null) {
++            for (String column : projectionIn) {
++                if (Telephony.Carriers.TYPE.equals(column) ||
++                        Telephony.Carriers.MMSC.equals(column) ||
++                        Telephony.Carriers.MMSPROXY.equals(column) ||
++                        Telephony.Carriers.MMSPORT.equals(column) ||
++                        Telephony.Carriers.APN.equals(column)) {
++                    // noop
++                } else {
++                    checkPermission();
++                    break;
++                }
++            }
++        } else {
++            // null returns all columns, so need permission check
++            checkPermission();
++        }
++
+         SQLiteDatabase db = mOpenHelper.getReadableDatabase();
+-        Cursor ret = qb.query(db, projectionIn, selection, selectionArgs, null, null, sort);
+-        ret.setNotificationUri(getContext().getContentResolver(), url);
++        Cursor ret = null;
++        try {
++            ret = qb.query(db, projectionIn, selection, selectionArgs, null, null, sort);
++        } catch (SQLException e) {
++            Log.e(TAG, "got exception when querying: " + e);
++        }
++        if (ret != null)
++            ret.setNotificationUri(getContext().getContentResolver(), url);
+         return ret;
+     }
+ 
+@@ -547,6 +607,12 @@ public class TelephonyProvider extends ContentProvider
+                 if (!values.containsKey(Telephony.Carriers.BEARER)) {
+                     values.put(Telephony.Carriers.BEARER, 0);
+                 }
++                if (!values.containsKey(Telephony.Carriers.MVNO_TYPE)) {
++                    values.put(Telephony.Carriers.MVNO_TYPE, "");
++                }
++                if (!values.containsKey(Telephony.Carriers.MVNO_MATCH_DATA)) {
++                    values.put(Telephony.Carriers.MVNO_MATCH_DATA, "");
++                }
+ 
+                 long rowID = db.insert(CARRIERS_TABLE, null, values);
+                 if (rowID > 0)
+@@ -715,7 +781,6 @@ public class TelephonyProvider extends ContentProvider
+     }
+ 
+     private void checkPermission() {
+-        // Check the permissions
+         getContext().enforceCallingOrSelfPermission("android.permission.WRITE_APN_SETTINGS",
+                 "No permission to write APN settings");
+     }
+@@ -725,7 +790,11 @@ public class TelephonyProvider extends ContentProvider
+     private void restoreDefaultAPN() {
+         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
+ 
+-        db.delete(CARRIERS_TABLE, null, null);
++        try {
++            db.delete(CARRIERS_TABLE, null, null);
++        } catch (SQLException e) {
++            Log.e(TAG, "got exception when deleting to restore: " + e);
++        }
+         setPreferredApnId((long)-1);
+         mOpenHelper.initDatabase(db);
+     }
