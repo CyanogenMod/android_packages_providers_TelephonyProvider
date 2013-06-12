@@ -24,10 +24,12 @@ import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.MatrixCursor;
+import android.database.MemoryCursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
+import android.os.Binder;
 import android.provider.Contacts;
 import android.provider.Telephony;
 import android.provider.Telephony.Mms;
@@ -41,6 +43,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 
 public class SmsProvider extends ContentProvider {
@@ -87,7 +90,25 @@ public class SmsProvider extends ContentProvider {
     }
 
     @Override
-    public Cursor query(Uri url, String[] projectionIn, String selection,
+    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs,
+            String sortOrder) {
+    	Cursor c = queryInternal(uri, projection, selection, selectionArgs, sortOrder);
+
+        if (getContext().isPrivacyGuardEnabled()) {
+            Log.d(TAG, "SMS query from application with privacy guard! pid=" + Binder.getCallingPid() +
+                    " uri=" + uri.toSafeString() +
+                    " projection=" + (projection == null ? null : Arrays.asList(projection).toString()) +
+                    " selection=" + selection +
+                    " selectionArgs=" + (selectionArgs == null ? null : Arrays.asList(selectionArgs).toString()));
+            MemoryCursor mc = new MemoryCursor(null, c.getColumnNames());
+            c.close();
+            return mc;
+        }
+
+        return c;
+    }
+
+    private Cursor queryInternal(Uri url, String[] projectionIn, String selection,
             String[] selectionArgs, String sort) {
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
 
@@ -336,6 +357,10 @@ public class SmsProvider extends ContentProvider {
 
     @Override
     public Uri insert(Uri url, ContentValues initialValues) {
+        if (getContext().isPrivacyGuardEnabled()) {
+            Log.d(TAG, "Write to SmsProvider from app with privacy guard, pid=" + Binder.getCallingPid());
+            return null;
+        }
         ContentValues values;
         long rowID;
         int type = Sms.MESSAGE_TYPE_ALL;
@@ -519,6 +544,10 @@ public class SmsProvider extends ContentProvider {
 
     @Override
     public int delete(Uri url, String where, String[] whereArgs) {
+        if (getContext().isPrivacyGuardEnabled()) {
+            Log.d(TAG, "Delete from SmsProvider by app with privacy guard, pid=" + Binder.getCallingPid());
+            return 0;
+        }
         int count;
         int match = sURLMatcher.match(url);
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
@@ -604,6 +633,10 @@ public class SmsProvider extends ContentProvider {
 
     @Override
     public int update(Uri url, ContentValues values, String where, String[] whereArgs) {
+        if (getContext().isPrivacyGuardEnabled()) {
+            Log.d(TAG, "Update to SmsProvider by app with privacy guard, pid=" + Binder.getCallingPid());
+            return 0;
+        }
         int count = 0;
         String table = TABLE_SMS;
         String extraWhere = null;

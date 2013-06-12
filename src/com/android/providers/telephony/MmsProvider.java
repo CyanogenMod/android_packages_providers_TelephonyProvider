@@ -22,10 +22,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.UriMatcher;
 import android.database.Cursor;
+import android.database.MemoryCursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
+import android.os.Binder;
 import android.os.FileUtils;
 import android.os.ParcelFileDescriptor;
 import android.provider.BaseColumns;
@@ -46,6 +48,8 @@ import com.google.android.mms.util.DownloadDrmHelper;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Arrays;
+
 import android.provider.Telephony.Threads;
 
 /**
@@ -68,7 +72,25 @@ public class MmsProvider extends ContentProvider {
     }
 
     @Override
-    public Cursor query(Uri uri, String[] projection,
+    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs,
+            String sortOrder) {
+    	Cursor c = queryInternal(uri, projection, selection, selectionArgs, sortOrder);
+
+        if (getContext().isPrivacyGuardEnabled()) {
+            Log.d(TAG, "MMS query from application with privacy guard! pid=" + Binder.getCallingPid() +
+                    " uri=" + uri.toSafeString() +
+                    " projection=" + (projection == null ? null : Arrays.asList(projection).toString()) +
+                    " selection=" + selection +
+                    " selectionArgs=" + (selectionArgs == null ? null : Arrays.asList(selectionArgs).toString()));
+            MemoryCursor mc = new MemoryCursor(null, c.getColumnNames());
+            c.close();
+            return mc;
+        }
+
+        return c;
+    }
+
+    private Cursor queryInternal(Uri uri, String[] projection,
             String selection, String[] selectionArgs, String sortOrder) {
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
 
@@ -271,6 +293,11 @@ public class MmsProvider extends ContentProvider {
         int match = sURLMatcher.match(uri);
         if (LOCAL_LOGV) {
             Log.v(TAG, "Insert uri=" + uri + ", match=" + match);
+        }
+
+        if (getContext().isPrivacyGuardEnabled()) {
+            Log.w(TAG, "Insert on SmsProvider by app with privacy guard, pid=" + Binder.getCallingPid());
+            return null;
         }
 
         String table = TABLE_PDU;
@@ -531,6 +558,11 @@ public class MmsProvider extends ContentProvider {
             Log.v(TAG, "Delete uri=" + uri + ", match=" + match);
         }
 
+        if (getContext().isPrivacyGuardEnabled()) {
+            Log.w(TAG, "Delete from MmsProvider by app with privacy guard, pid=" + Binder.getCallingPid());
+            return 0;
+        }
+
         String table, extraSelection = null;
         boolean notify = false;
 
@@ -682,6 +714,11 @@ public class MmsProvider extends ContentProvider {
         int match = sURLMatcher.match(uri);
         if (LOCAL_LOGV) {
             Log.v(TAG, "Update uri=" + uri + ", match=" + match);
+        }
+
+        if (getContext().isPrivacyGuardEnabled()) {
+            Log.w(TAG, "Update to MmsProvider by app with privacy guard, pid=" + Binder.getCallingPid());
+            return 0;
         }
 
         boolean notify = false;

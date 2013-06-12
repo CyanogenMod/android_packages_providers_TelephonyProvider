@@ -27,10 +27,12 @@ import android.content.Context;
 import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
+import android.database.MemoryCursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
+import android.os.Binder;
 import android.provider.BaseColumns;
 import android.provider.Telephony.CanonicalAddressesColumns;
 import android.provider.Telephony.Mms;
@@ -290,7 +292,27 @@ public class MmsSmsProvider extends ContentProvider {
     }
 
     @Override
-    public Cursor query(Uri uri, String[] projection,
+    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs,
+            String sortOrder) {
+    	Cursor c = queryInternal(uri, projection, selection, selectionArgs, sortOrder);
+
+        if (getContext().isPrivacyGuardEnabled()) {
+            Log.d(LOG_TAG, "MMS/SMS query from application with privacy guard! pid=" + Binder.getCallingPid() +
+                    " uri=" + uri.toSafeString() +
+                    " projection=" + (projection == null ? null : Arrays.asList(projection).toString()) +
+                    " selection=" + selection +
+                    " selectionArgs=" + (selectionArgs == null ? null : Arrays.asList(selectionArgs).toString()));
+            if (URI_MATCHER.match(uri) != URI_THREAD_ID) {
+                MemoryCursor mc = new MemoryCursor(null, c.getColumnNames());
+                c.close();
+                return mc;
+            }
+        }
+
+        return c;
+    }
+
+    private Cursor queryInternal(Uri uri, String[] projection,
             String selection, String[] selectionArgs, String sortOrder) {
         SQLiteDatabase db = mOpenHelper.getReadableDatabase();
         Cursor cursor = null;
@@ -1167,6 +1189,10 @@ public class MmsSmsProvider extends ContentProvider {
     @Override
     public int delete(Uri uri, String selection,
             String[] selectionArgs) {
+        if (getContext().isPrivacyGuardEnabled()) {
+            Log.d(LOG_TAG, "Delete on MmsSmsProvider from app with privacy guard, pid=" + Binder.getCallingPid());
+            return 0;
+        }
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
         Context context = getContext();
         int affectedRows = 0;
@@ -1222,6 +1248,10 @@ public class MmsSmsProvider extends ContentProvider {
 
     @Override
     public Uri insert(Uri uri, ContentValues values) {
+        if (getContext().isPrivacyGuardEnabled()) {
+            Log.d(LOG_TAG, "Write to MmsSmsProvider from app with privacy guard, pid=" + Binder.getCallingPid());
+            return null;
+        }
         if (URI_MATCHER.match(uri) == URI_PENDING_MSG) {
             SQLiteDatabase db = mOpenHelper.getWritableDatabase();
             long rowId = db.insert(TABLE_PENDING_MSG, null, values);
@@ -1233,6 +1263,10 @@ public class MmsSmsProvider extends ContentProvider {
     @Override
     public int update(Uri uri, ContentValues values,
             String selection, String[] selectionArgs) {
+        if (getContext().isPrivacyGuardEnabled()) {
+            Log.d(LOG_TAG, "Update to MmsSmsProvider from app with privacy guard, pid=" + Binder.getCallingPid());
+            return 0;
+        }
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
         int affectedRows = 0;
         switch(URI_MATCHER.match(uri)) {
