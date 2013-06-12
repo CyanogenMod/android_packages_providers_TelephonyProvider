@@ -24,10 +24,12 @@ import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.MatrixCursor;
+import android.database.MemoryCursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
+import android.os.Binder;
 import android.provider.Contacts;
 import android.provider.Telephony;
 import android.provider.Telephony.Mms;
@@ -87,7 +89,21 @@ public class SmsProvider extends ContentProvider {
     }
 
     @Override
-    public Cursor query(Uri url, String[] projectionIn, String selection,
+    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs,
+            String sortOrder) {
+    	Cursor c = queryInternal(uri, projection, selection, selectionArgs, sortOrder);
+
+        if (getContext().isIncognito()) {
+            Log.d(TAG, "SMS query from application in incognito mode! pid=" + Binder.getCallingPid());
+            MemoryCursor mc = new MemoryCursor(null, c.getColumnNames());
+            c.close();
+            return mc;
+        }
+
+        return c;
+    }
+
+    private Cursor queryInternal(Uri url, String[] projectionIn, String selection,
             String[] selectionArgs, String sort) {
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
 
