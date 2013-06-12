@@ -76,6 +76,10 @@ public class TelephonyProvider extends ContentProvider
 
     private static final String PARTNER_APNS_PATH = "etc/apns-conf.xml";
 
+    private static final String NUMERIC_MATCH_REGEX = "(numeric *= *[',\"][0-9]+[',\"])";
+    private static final String NUMERIC_ADD_DEFAULT_REGEX = "\\($1 or numeric = '000000'\\)";
+    private static boolean sConfigDefaultApnEnabled;
+
     private static final UriMatcher s_urlMatcher = new UriMatcher(UriMatcher.NO_MATCH);
 
     private static final ContentValues s_currentNullMap;
@@ -465,6 +469,8 @@ public class TelephonyProvider extends ContentProvider
     @Override
     public boolean onCreate() {
         mOpenHelper = new DatabaseHelper(getContext());
+        sConfigDefaultApnEnabled =
+                getContext().getResources().getBoolean(R.bool.config_enable_default_apn);
         return true;
     }
 
@@ -656,6 +662,17 @@ public class TelephonyProvider extends ContentProvider
         Cursor ret = null;
         try {
             ret = qb.query(db, projectionIn, selection, selectionArgs, null, null, sort);
+            if (sConfigDefaultApnEnabled) {
+                // Additional query for default APNs.
+                if (ret != null && ret.getCount() == 0) {
+                    String newSelection = null;
+                    if (selection != null) {
+                        newSelection = selection.replaceAll(NUMERIC_MATCH_REGEX,
+                                NUMERIC_ADD_DEFAULT_REGEX);
+                    }
+                    ret = qb.query(db, projectionIn, newSelection, selectionArgs, null, null, sort);
+                }
+            }
         } catch (SQLException e) {
             Log.e(TAG, "got exception when querying: " + e);
         }
