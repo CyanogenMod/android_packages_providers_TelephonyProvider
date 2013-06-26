@@ -23,12 +23,18 @@
 
     <application android:process="com.android.phone"
                  android:allowClearUserData="false"
-                 android:allowBackup="false"
+                 android:backupAgent=".TelephonyBackupAgent"
                  android:label="@string/app_label"
                  android:icon="@mipmap/ic_launcher_phone">
 
         <provider android:name="TelephonyProvider"
                   android:authorities="telephony"
+                  android:exported="true"
+                  android:multiprocess="true" />
+
+        <!-- TODO: permission -->
+        <provider android:name="BlacklistProvider"
+                  android:authorities="blacklist"
                   android:exported="true"
                   android:multiprocess="true" />
 
