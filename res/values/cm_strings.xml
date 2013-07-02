@@ -20,4 +20,7 @@
 
     <!-- Apn read only -->
     <string name="read_only">read_only</string>
+
+    <!-- Apn localized name -->
+    <string name="localized_name">localized_name</string>
 </resources>
