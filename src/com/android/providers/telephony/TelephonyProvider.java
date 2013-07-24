@@ -26,6 +26,7 @@ import android.content.UriMatcher;
 import android.content.res.Resources;
 import android.content.res.XmlResourceParser;
 import android.database.Cursor;
+import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQueryBuilder;
@@ -57,7 +58,7 @@ public class TelephonyProvider extends ContentProvider
     private static final String DATABASE_NAME = "telephony.db";
     private static final boolean DBG = true;
 
-    private static final int DATABASE_VERSION = 7 << 16;
+    private static final int DATABASE_VERSION = 8 << 16;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
     private static final int URL_ID = 3;
@@ -148,7 +149,9 @@ public class TelephonyProvider extends ContentProvider
                     "protocol TEXT," +
                     "roaming_protocol TEXT," +
                     "carrier_enabled BOOLEAN," +
-                    "bearer INTEGER);");
+                    "bearer INTEGER," +
+                    "mvno_type TEXT," +
+                    "mvno_match_data TEXT);");
 
             initDatabase(db);
         }
@@ -186,7 +189,7 @@ public class TelephonyProvider extends ContentProvider
                 parser.close();
             }
 
-           // Read external APNS data (partner-provided)
+            // Read external APNS data (partner-provided)
             XmlPullParser confparser = null;
             // Environment.getRootDirectory() is a fancy way of saying ANDROID_ROOT or "/system".
             File confFile = new File(Environment.getRootDirectory(), PARTNER_APNS_PATH);
@@ -244,12 +247,21 @@ public class TelephonyProvider extends ContentProvider
                 oldVersion = 6 << 16 | 6;
             }
             if (oldVersion < (7 << 16 | 6)) {
-                // Add protcol fields to the APN. The XML file does not change.
+                // Add carrier_enabled, bearer fields to the APN. The XML file does not change.
                 db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
                         " ADD COLUMN carrier_enabled BOOLEAN DEFAULT 1;");
                 db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
                         " ADD COLUMN bearer INTEGER DEFAULT 0;");
                 oldVersion = 7 << 16 | 6;
+            }
+            if (oldVersion < (8 << 16 | 6)) {
+                // Add mvno_type, mvno_match_data fields to the APN.
+                // The XML file does not change.
+                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                        " ADD COLUMN mvno_type TEXT DEFAULT '';");
+                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                        " ADD COLUMN mvno_match_data TEXT DEFAULT '';");
+                oldVersion = 8 << 16 | 6;
             }
         }
 
@@ -326,6 +338,15 @@ public class TelephonyProvider extends ContentProvider
             if (bearer != null) {
                 map.put(Telephony.Carriers.BEARER, Integer.parseInt(bearer));
             }
+
+            String mvno_type = parser.getAttributeValue(null, "mvno_type");
+            if (mvno_type != null) {
+                String mvno_match_data = parser.getAttributeValue(null, "mvno_match_data");
+                if (mvno_match_data != null) {
+                    map.put(Telephony.Carriers.MVNO_TYPE, mvno_type);
+                    map.put(Telephony.Carriers.MVNO_MATCH_DATA, mvno_match_data);
+                }
+            }
             return map;
         }
 
@@ -339,19 +360,25 @@ public class TelephonyProvider extends ContentProvider
         private void loadApns(SQLiteDatabase db, XmlPullParser parser) {
             if (parser != null) {
                 try {
-                    while (true) {
-                        XmlUtils.nextElement(parser);
+                    db.beginTransaction();
+                    XmlUtils.nextElement(parser);
+                    while (parser.getEventType() != XmlPullParser.END_DOCUMENT) {
                         ContentValues row = getRow(parser);
-                        if (row != null) {
-                            insertAddingDefaults(db, CARRIERS_TABLE, row);
-                        } else {
-                            break;  // do we really want to skip the rest of the file?
+                        if (row == null) {
+                            throw new XmlPullParserException("Expected 'apn' tag", parser, null);
                         }
+                        insertAddingDefaults(db, CARRIERS_TABLE, row);
+                        XmlUtils.nextElement(parser);
                     }
-                } catch (XmlPullParserException e)  {
-                    Log.e(TAG, "Got execption while getting perferred time zone.", e);
+                    db.setTransactionSuccessful();
+                } catch (XmlPullParserException e) {
+                    Log.e(TAG, "Got XmlPullParserException while loading apns.", e);
                 } catch (IOException e) {
-                    Log.e(TAG, "Got execption while getting perferred time zone.", e);
+                    Log.e(TAG, "Got IOException while loading apns.", e);
+                } catch (SQLException e) {
+                    Log.e(TAG, "Got SQLException while loading apns.", e);
+                } finally {
+                    db.endTransaction();
                 }
             }
         }
@@ -372,6 +399,12 @@ public class TelephonyProvider extends ContentProvider
             }
             if (row.containsKey(Telephony.Carriers.BEARER) == false) {
                 row.put(Telephony.Carriers.BEARER, 0);
+            }
+            if (row.containsKey(Telephony.Carriers.MVNO_TYPE) == false) {
+                row.put(Telephony.Carriers.MVNO_TYPE, "");
+            }
+            if (row.containsKey(Telephony.Carriers.MVNO_MATCH_DATA) == false) {
+                row.put(Telephony.Carriers.MVNO_MATCH_DATA, "");
             }
             db.insert(CARRIERS_TABLE, null, row);
         }
@@ -470,10 +503,8 @@ public class TelephonyProvider extends ContentProvider
     @Override
     public Cursor query(Uri url, String[] projectionIn, String selection,
             String[] selectionArgs, String sort) {
-
-        checkPermission();
-
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
+        qb.setStrict(true); // a little protection from injection attacks
         qb.setTables("carriers");
 
         int match = s_urlMatcher.match(url);
@@ -507,9 +538,33 @@ public class TelephonyProvider extends ContentProvider
             }
         }
 
+        if (projectionIn != null) {
+            for (String column : projectionIn) {
+                if (Telephony.Carriers.TYPE.equals(column) ||
+                        Telephony.Carriers.MMSC.equals(column) ||
+                        Telephony.Carriers.MMSPROXY.equals(column) ||
+                        Telephony.Carriers.MMSPORT.equals(column) ||
+                        Telephony.Carriers.APN.equals(column)) {
+                    // noop
+                } else {
+                    checkPermission();
+                    break;
+                }
+            }
+        } else {
+            // null returns all columns, so need permission check
+            checkPermission();
+        }
+
         SQLiteDatabase db = mOpenHelper.getReadableDatabase();
-        Cursor ret = qb.query(db, projectionIn, selection, selectionArgs, null, null, sort);
-        ret.setNotificationUri(getContext().getContentResolver(), url);
+        Cursor ret = null;
+        try {
+            ret = qb.query(db, projectionIn, selection, selectionArgs, null, null, sort);
+        } catch (SQLException e) {
+            Log.e(TAG, "got exception when querying: " + e);
+        }
+        if (ret != null)
+            ret.setNotificationUri(getContext().getContentResolver(), url);
         return ret;
     }
 
@@ -596,6 +651,12 @@ public class TelephonyProvider extends ContentProvider
                 }
                 if (!values.containsKey(Telephony.Carriers.BEARER)) {
                     values.put(Telephony.Carriers.BEARER, 0);
+                }
+                if (!values.containsKey(Telephony.Carriers.MVNO_TYPE)) {
+                    values.put(Telephony.Carriers.MVNO_TYPE, "");
+                }
+                if (!values.containsKey(Telephony.Carriers.MVNO_MATCH_DATA)) {
+                    values.put(Telephony.Carriers.MVNO_MATCH_DATA, "");
                 }
 
                 long rowID = db.insert(CARRIERS_TABLE, null, values);
@@ -774,7 +835,11 @@ public class TelephonyProvider extends ContentProvider
     private void restoreDefaultAPN() {
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
 
-        db.delete(CARRIERS_TABLE, null, null);
+        try {
+            db.delete(CARRIERS_TABLE, null, null);
+        } catch (SQLException e) {
+            Log.e(TAG, "got exception when deleting to restore: " + e);
+        }
         setPreferredApnId((long)-1);
         mOpenHelper.initDatabase(db);
         setPreferredApnId(getDefaultPreferredApnId());
