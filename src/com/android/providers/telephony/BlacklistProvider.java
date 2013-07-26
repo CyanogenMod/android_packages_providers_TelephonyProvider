@@ -205,19 +205,28 @@ public class BlacklistProvider extends ContentProvider {
 
         switch (match) {
             case BL_ALL:
-                count = db.delete(BLACKLIST_TABLE, where, whereArgs);
                 break;
             case BL_ID:
-                count = db.delete(BLACKLIST_TABLE, Blacklist._ID + " = ?",
-                        new String[] { uri.getLastPathSegment() });
+                if (where != null || whereArgs != null) {
+                    throw new UnsupportedOperationException(
+                            "Cannot delete URI " + uri + " with a where clause");
+                }
+                where = Blacklist._ID + " = ?";
+                whereArgs = new String[] { uri.getLastPathSegment() };
+                break;
             case BL_NUMBER:
-                count = db.delete(BLACKLIST_TABLE, COLUMN_NORMALIZED + " = ?",
-                        new String[] { normalizeNumber(uri.getLastPathSegment()) });
+                if (where != null || whereArgs != null) {
+                    throw new UnsupportedOperationException(
+                            "Cannot delete URI " + uri + " with a where clause");
+                }
+                where = COLUMN_NORMALIZED + " = ?";
+                whereArgs = new String[] { normalizeNumber(uri.getLastPathSegment()) };
                 break;
             default:
                 throw new UnsupportedOperationException("Cannot delete that URI: " + uri);
         }
 
+        count = db.delete(BLACKLIST_TABLE, where, whereArgs);
         if (DEBUG) Log.d(TAG, "delete result count " + count);
 
         if (count > 0) {
