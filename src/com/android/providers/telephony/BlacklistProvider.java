@@ -37,7 +37,7 @@ public class BlacklistProvider extends ContentProvider {
     private static final boolean DEBUG = true;
 
     private static final String DATABASE_NAME = "blacklist.db";
-    private static final int DATABASE_VERSION = 1;
+    private static final int DATABASE_VERSION = 2;
 
     private static final String BLACKLIST_TABLE = "blacklist";
     private static final String COLUMN_NORMALIZED = "normalized_number";
@@ -82,7 +82,13 @@ public class BlacklistProvider extends ContentProvider {
 
         @Override
         public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-            // won't happen, we're at version 1
+            if (oldVersion < 2) {
+                db.execSQL("ALTER TABLE " + BLACKLIST_TABLE +
+                        " RENAME TO " + BLACKLIST_TABLE + "_old;");
+                onCreate(db);
+                db.execSQL("INSERT INTO " + BLACKLIST_TABLE +
+                        " SELECT * FROM " + BLACKLIST_TABLE + "_old;");
+            }
         }
     }
 
