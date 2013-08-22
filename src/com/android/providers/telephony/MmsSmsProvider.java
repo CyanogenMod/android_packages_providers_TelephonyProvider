@@ -96,6 +96,7 @@ public class MmsSmsProvider extends ContentProvider {
     private static final int URI_MESSAGE_ID_TO_THREAD              = 18;
     private static final int URI_MAILBOX_MESSAGES                  = 19;
     private static final int URI_MAILBOXS = 21;
+    private static final int URI_MAILBOX_MESSAGES_COUNT            = 22;
 
     /**
      * the name of the table that is used to store the queue of
@@ -276,6 +277,9 @@ public class MmsSmsProvider extends ContentProvider {
         // URI for get message count in mailboxs
         URI_MATCHER.addURI(AUTHORITY, "mailboxs", URI_MAILBOXS);
 
+        // URI for obtaining all short message count
+        URI_MATCHER.addURI(AUTHORITY, "messagescount", URI_MAILBOX_MESSAGES_COUNT);
+
         // URI for deleting obsolete threads.
         URI_MATCHER.addURI(AUTHORITY, "conversations/obsolete", URI_OBSOLETE_THREADS);
 
@@ -376,6 +380,8 @@ public class MmsSmsProvider extends ContentProvider {
                 cursor = getMailboxMessages(projection, selection, selectionArgs,
                         sortOrder, false);
                 break;
+            case URI_MAILBOX_MESSAGES_COUNT:
+                return getMailboxMessagesCount();
             case URI_CONVERSATIONS_RECIPIENTS:
                 cursor = getConversationById(
                         uri.getPathSegments().get(1), projection, selection,
@@ -1121,6 +1127,17 @@ public class MmsSmsProvider extends ContentProvider {
         } else {
             unionQuery = MAILBOX_QUERY;
         }
+
+        return mOpenHelper.getReadableDatabase().rawQuery(unionQuery, EMPTY_STRING_ARRAY);
+    }
+
+    /**
+     * Return the SMS messages count on phone
+     */
+    private Cursor getMailboxMessagesCount() {
+        String unionQuery = "select sum(a) AS count, 1 AS _id "
+                + "from (" + "select count(sms._id) as a, 2 AS b from sms, threads"
+                + " where thread_id NOTNULL AND thread_id = threads._id)";
 
         return mOpenHelper.getReadableDatabase().rawQuery(unionQuery, EMPTY_STRING_ARRAY);
     }
