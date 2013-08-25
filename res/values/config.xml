@@ -22,4 +22,6 @@
 
     <!-- Whether default apn feature is enabled. -->
     <bool name="config_enable_default_apn">false</bool>
+    <!-- Whether roaming area APN restriction feature is enabled. -->
+    <bool name="config_enable_roaming_area_apn_restriction">false</bool>
 </resources>

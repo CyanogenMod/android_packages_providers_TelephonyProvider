@@ -23,4 +23,7 @@
 
     <!-- Apn localized name -->
     <string name="localized_name">localized_name</string>
+
+    <!-- v_mccmnc -->
+    <string name="v_mccmnc">v_mccmnc</string>
 </resources>
