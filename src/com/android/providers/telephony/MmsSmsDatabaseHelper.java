@@ -594,6 +594,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    Mms.LOCKED + " INTEGER DEFAULT 0," +
                    Mms.SEEN + " INTEGER DEFAULT 0," +
                    Mms.TEXT_ONLY + " INTEGER DEFAULT 0" +
+                   "sub_id INTEGER DEFAULT 0" +
                    ");");
 
         db.execSQL("CREATE TABLE " + MmsProvider.TABLE_ADDR + " (" +
@@ -835,6 +836,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "body TEXT," +
                    "service_center TEXT," +
                    "locked INTEGER DEFAULT 0," +
+                   "sub_id INTEGER DEFAULT 0," + // sub_id : 0 for subscription 1
+                                                 // sub_id : 1 for subscription 2
                    "error_code INTEGER DEFAULT 0," +
                    "seen INTEGER DEFAULT 0" +
                    ");");
@@ -1273,6 +1276,22 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             } finally {
                 db.endTransaction();
             }
+            // fall through
+        case 57:
+            if (currentVersion <= 57) {
+                return;
+            }
+
+            db.beginTransaction();
+            try {
+                upgradeDatabaseToVersion58(db);
+                db.setTransactionSuccessful();
+            } catch (Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+                break;
+            } finally {
+                db.endTransaction();
+            }
             return;
         }
 
@@ -1472,6 +1491,14 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private void upgradeDatabaseToVersion57(SQLiteDatabase db) {
         // Clear out bad rows, those with empty threadIds, from the pdu table.
         db.execSQL("DELETE FROM " + MmsProvider.TABLE_PDU + " WHERE " + Mms.THREAD_ID + " IS NULL");
+    }
+
+    private void upgradeDatabaseToVersion58(SQLiteDatabase db) {
+        // Add 'sub_id' column to pdu table.
+        db.execSQL("ALTER TABLE " + MmsProvider.TABLE_PDU + " ADD COLUMN sub_id" +
+                " INTEGER DEFAULT 0");
+        db.execSQL("ALTER TABLE " + SmsProvider.TABLE_SMS + " ADD COLUMN sub_id" +
+                " INTEGER DEFAULT 0");
     }
 
     @Override
@@ -1753,6 +1780,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 Mms.LOCKED + " INTEGER DEFAULT 0," +
                 Mms.SEEN + " INTEGER DEFAULT 0," +
                 Mms.TEXT_ONLY + " INTEGER DEFAULT 0" +
+                "sub_id INTEGER DEFAULT 0" +
                 ");");
 
         db.execSQL("INSERT INTO pdu_temp SELECT * from pdu;");
