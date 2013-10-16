@@ -215,7 +215,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private static boolean sFakeLowStorageTest = false;     // for testing only
 
     static final String DATABASE_NAME = "mmssms.db";
-    static final int DATABASE_VERSION = 57;
+    static final int DATABASE_VERSION = 58;
     private final Context mContext;
     private LowStorageMonitor mLowStorageMonitor;
 
