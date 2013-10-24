@@ -419,6 +419,9 @@ public class SmsProvider extends ContentProvider {
                 return null;
         }
 
+        // Use phone app permissions to avoid UID mismatch in AppOpsManager.noteOp() call.
+        long token = Binder.clearCallingIdentity();
+
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
 
         if (table.equals(TABLE_SMS)) {
@@ -522,6 +525,8 @@ public class SmsProvider extends ContentProvider {
             cv.put(Telephony.MmsSms.WordsTable.TABLE_ID, 1);
             db.insert(TABLE_WORDS, Telephony.MmsSms.WordsTable.INDEXED_TEXT, cv);
         }
+        Binder.restoreCallingIdentity(token);
+
         if (rowID > 0) {
             Uri uri = Uri.parse("content://" + table + "/" + rowID);
 
