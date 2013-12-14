@@ -593,7 +593,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    Mms.DELIVERY_REPORT + " INTEGER," +
                    Mms.LOCKED + " INTEGER DEFAULT 0," +
                    Mms.SEEN + " INTEGER DEFAULT 0," +
-                   Mms.TEXT_ONLY + " INTEGER DEFAULT 0" +
+                   Mms.TEXT_ONLY + " INTEGER DEFAULT 0," +
                    "sub_id INTEGER DEFAULT 0" +
                    ");");
 
