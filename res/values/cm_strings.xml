@@ -17,4 +17,7 @@
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <!-- Apn PPP number -->
     <string name="ppp_number">ppp_number</string>
+
+    <!-- Apn read only -->
+    <string name="read_only">read_only</string>
 </resources>
