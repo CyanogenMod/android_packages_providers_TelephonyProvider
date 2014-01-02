@@ -40,6 +40,10 @@
                   android:readPermission="android.permission.READ_PHONE_BLACKLIST"
                   android:writePermission="android.permission.CHANGE_PHONE_BLACKLIST" />
 
+        <provider android:name="CdmaCallOptionProvider"
+                  android:authorities="cdma"
+                  android:multiprocess="true" />
+
         <provider android:name="SmsProvider"
                   android:authorities="sms"
                   android:multiprocess="false"
