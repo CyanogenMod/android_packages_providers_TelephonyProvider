@@ -95,6 +95,7 @@ public class MmsSmsProvider extends ContentProvider {
     private static final int URI_FIRST_LOCKED_MESSAGE_BY_THREAD_ID = 17;
     private static final int URI_MESSAGE_ID_TO_THREAD              = 18;
     private static final int URI_MAILBOX_MESSAGES                  = 19;
+    private static final int URI_MAILBOXS = 21;
 
     /**
      * the name of the table that is used to store the queue of
@@ -213,6 +214,46 @@ public class MmsSmsProvider extends ContentProvider {
             SMS_QUERY + " UNION " + MMS_QUERY +
             " GROUP BY thread_id ORDER BY thread_id ASC, date DESC";
 
+    // This code queries the SMS and MMS's total number, the number of read and unread
+    // for the each box type which is inbox, sendbox, outbox, draftbox.
+    private static final String MAILBOX_QUERY =
+            "select boxname, messeagebox._id AS _id ,messeagebox.boxtype, "
+            + "count(idd) as total, sum(ifnull(read,0)) as readed, "
+            + "count(idd) - sum(ifnull(read,0)) as noread from "
+            + "(select 0 AS _id, \"Inbox\" AS boxname, 1 AS boxtype "
+            + "union select 1 AS _id, \"Sent\" AS boxname, 2 AS boxtype "
+            + "union select 3 AS _id, \"Outbox\" AS boxname, 4 AS boxtype "
+            + "union select 4 AS _id, \"Outbox\" AS boxname, 5 AS boxtype "
+            + "union select 5 AS _id, \"Outbox\" AS boxname, 6 AS boxtype "
+            + "union select 6 AS _id, \"Drafts\" AS boxname, 3 AS boxtype "
+            + ")messeagebox "
+            + "left join "
+            + "(select sms._id AS idd, sms.type, sms.read, 1 AS hs_msg_type from sms, threads"
+            + " where thread_id NOTNULL AND thread_id = threads._id "
+            + "union "
+            + "select pdu._id AS idd, msg_box AS type, pdu.read, 2 AS hs_msg_type from pdu,"
+            + " threads where thread_id NOTNULL AND thread_id = threads._id AND m_type != 134)"
+            + "on messeagebox.boxtype = type "
+            + "group by boxname order by _id";
+
+    // This code queries the SMS's total number, the number of read and unread
+    // for the each box type which is inbox, sendbox, outbox, draftbox.
+    private static final String MAILBOX_SMS_QUERY =
+            "select boxname, messeagebox._id AS _id ,messeagebox.boxtype, "
+            + "count(idd) as total, sum(ifnull(read,0)) as readed, "
+            + "count(idd) - sum(ifnull(read,0)) as noread from "
+            + "(select 0 AS _id, \"Inbox\" AS boxname, 1 AS boxtype "
+            + "union select 1 AS _id, \"Sent\" AS boxname, 2 AS boxtype "
+            + "union select 3 AS _id, \"Outbox\" AS boxname, 4 AS boxtype "
+            + "union select 4 AS _id, \"Outbox\" AS boxname, 5 AS boxtype "
+            + "union select 5 AS _id, \"Outbox\" AS boxname, 6 AS boxtype "
+            + "union select 6 AS _id, \"Drafts\" AS boxname, 3 AS boxtype "
+            + ")messeagebox "
+            + "left join "
+            + "(select _id AS idd, type, read, 1 AS hs_msg_type from sms where thread_id NOTNULL)"
+            + "on messeagebox.boxtype = type "
+            + "group by boxname order by _id";
+
     private static final String AUTHORITY = "mms-sms";
 
     static {
@@ -232,6 +273,8 @@ public class MmsSmsProvider extends ContentProvider {
 
         //"#" is the mailbox name id, such as inbox=1, sent=2, draft = 3 , outbox = 4
         URI_MATCHER.addURI(AUTHORITY, "mailbox/#", URI_MAILBOX_MESSAGES);
+        // URI for get message count in mailboxs
+        URI_MATCHER.addURI(AUTHORITY, "mailboxs", URI_MAILBOXS);
 
         // URI for deleting obsolete threads.
         URI_MATCHER.addURI(AUTHORITY, "conversations/obsolete", URI_OBSOLETE_THREADS);
@@ -328,6 +371,10 @@ public class MmsSmsProvider extends ContentProvider {
                 cursor = getMailboxMessages(
                         uri.getPathSegments().get(1), projection, selection,
                         selectionArgs, sortOrder, false);
+                break;
+            case URI_MAILBOXS:
+                cursor = getMailboxMessages(projection, selection, selectionArgs,
+                        sortOrder, false);
                 break;
             case URI_CONVERSATIONS_RECIPIENTS:
                 cursor = getConversationById(
@@ -1057,6 +1104,25 @@ public class MmsSmsProvider extends ContentProvider {
 
         return outerQueryBuilder.buildQuery(projection, null, null, null, null,
                 sortOrder, null);
+    }
+
+    /**
+     * Use this query: select msgbox.name, msgbox.boxtype, count(idd) as total,
+     * sum(ifnull(read,0)) as readed, count(idd) - sum(ifnull(read,0)) as noread
+     * from msgbox left join( select _id AS idd, type, read from sms union
+     * select _id AS idd, msg_box AS type, read from pdu )on msgbox.boxtype =
+     * type group by type order by boxtype
+     */
+    private Cursor getMailboxMessages(String[] projection, String selection,
+            String[] selectionArgs, String sortOrder, boolean onlySms) {
+        String unionQuery = null;
+        if (onlySms) {
+            unionQuery = MAILBOX_SMS_QUERY;
+        } else {
+            unionQuery = MAILBOX_QUERY;
+        }
+
+        return mOpenHelper.getReadableDatabase().rawQuery(unionQuery, EMPTY_STRING_ARRAY);
     }
 
     /**
