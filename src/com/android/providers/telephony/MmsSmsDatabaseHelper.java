@@ -839,7 +839,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "sub_id INTEGER DEFAULT 0," +   // sub_id : 0 for subscription 1
                                                    // sub_id : 1 for subscription 2
                    "error_code INTEGER DEFAULT 0," +
-                   "seen INTEGER DEFAULT 0" +
+                   "seen INTEGER DEFAULT 0," +
+                   "pri INTEGER DEFAULT -1" +
                    ");");
 
         /**
