@@ -37,10 +37,13 @@ import android.provider.Telephony.MmsSms;
 import android.provider.Telephony.Sms;
 import android.provider.Telephony.TextBasedSmsColumns;
 import android.provider.Telephony.Threads;
+import android.telephony.MSimSmsManager;
 import android.telephony.SmsManager;
 import android.telephony.SmsMessage;
 import android.text.TextUtils;
 import android.util.Log;
+
+import com.android.internal.telephony.MSimConstants;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -52,7 +55,9 @@ public class SmsProvider extends ContentProvider {
     private static final String TABLE_RAW = "raw";
     private static final String TABLE_SR_PENDING = "sr_pending";
     private static final String TABLE_WORDS = "words";
-
+    private static final int DELETE_SUCCESS = 1;
+    private static final int DELETE_FAIL = 0;
+    private static final int MESSAGE_ID = 1;
     private static final Integer ONE = Integer.valueOf(1);
 
     private static final String[] CONTACT_QUERY_PROJECTION =
@@ -202,12 +207,27 @@ public class SmsProvider extends ContentProvider {
                 break;
 
             case SMS_ALL_ICC:
-                return getAllMessagesFromIcc();
+                return getAllMessagesFromIcc(MSimConstants.INVALID_SUBSCRIPTION);
 
             case SMS_ICC:
-                String messageIndexString = url.getPathSegments().get(1);
+                String messageIndexIcc = url.getPathSegments().get(MESSAGE_ID);
 
-                return getSingleMessageFromIcc(messageIndexString);
+                return getSingleMessageFromIcc(messageIndexIcc,
+                        MSimConstants.INVALID_SUBSCRIPTION);
+
+            case SMS_ALL_ICC1:
+                return getAllMessagesFromIcc(MSimConstants.SUB1);
+
+            case SMS_ICC1:
+                String messageIndexIcc1 = url.getPathSegments().get(MESSAGE_ID);
+                return getSingleMessageFromIcc(messageIndexIcc1, MSimConstants.SUB1);
+
+            case SMS_ALL_ICC2:
+                return getAllMessagesFromIcc(MSimConstants.SUB2);
+
+            case SMS_ICC2:
+                String messageIndexIcc2 = url.getPathSegments().get(MESSAGE_ID);
+                return getSingleMessageFromIcc(messageIndexIcc2, MSimConstants.SUB2);
 
             default:
                 Log.e(TAG, "Invalid request: " + url);
@@ -255,11 +275,18 @@ public class SmsProvider extends ContentProvider {
     /**
      * Return a Cursor containing just one message from the ICC.
      */
-    private Cursor getSingleMessageFromIcc(String messageIndexString) {
+    private Cursor getSingleMessageFromIcc(String messageIndexString, int subscription) {
+        ArrayList<SmsMessage> messages;
         try {
             int messageIndex = Integer.parseInt(messageIndexString);
-            SmsManager smsManager = SmsManager.getDefault();
-            ArrayList<SmsMessage> messages = smsManager.getAllMessagesFromIcc();
+
+            if (subscription == MSimConstants.INVALID_SUBSCRIPTION) {
+                SmsManager smsManager = SmsManager.getDefault();
+                messages = smsManager.getAllMessagesFromIcc();
+            } else {
+                MSimSmsManager mSimSmsManager = MSimSmsManager.getDefault();
+                messages = mSimSmsManager.getAllMessagesFromIcc(subscription);
+            }
 
             SmsMessage message = messages.get(messageIndex);
             if (message == null) {
@@ -278,18 +305,22 @@ public class SmsProvider extends ContentProvider {
     /**
      * Return a Cursor listing all the messages stored on the ICC.
      */
-    private Cursor getAllMessagesFromIcc() {
-        SmsManager smsManager = SmsManager.getDefault();
+    private Cursor getAllMessagesFromIcc(int subscription) {
         ArrayList<SmsMessage> messages;
 
         // use phone app permissions to avoid UID mismatch in AppOpsManager.noteOp() call
         long token = Binder.clearCallingIdentity();
         try {
-            messages = smsManager.getAllMessagesFromIcc();
+            if (subscription == MSimConstants.INVALID_SUBSCRIPTION) {
+                SmsManager smsManager = SmsManager.getDefault();
+                messages = smsManager.getAllMessagesFromIcc();
+            } else {
+                MSimSmsManager mSimSmsManager = MSimSmsManager.getDefault();
+                messages = mSimSmsManager.getAllMessagesFromIcc(subscription);
+            }
         } finally {
             Binder.restoreCallingIdentity(token);
         }
-
         final int count = messages.size();
         MatrixCursor cursor = new MatrixCursor(ICC_COLUMNS, count);
         for (int i = 0; i < count; i++) {
@@ -587,9 +618,17 @@ public class SmsProvider extends ContentProvider {
                 break;
 
             case SMS_ICC:
-                String messageIndexString = url.getPathSegments().get(1);
+                String messageIndexIcc = url.getPathSegments().get(MESSAGE_ID);
 
-                return deleteMessageFromIcc(messageIndexString);
+                return deleteMessageFromIcc(messageIndexIcc, MSimConstants.INVALID_SUBSCRIPTION);
+            case SMS_ICC1:
+                String messageIndexIcc1 = url.getPathSegments().get(MESSAGE_ID);
+
+                return deleteMessageFromIcc(messageIndexIcc1, MSimConstants.SUB1);
+            case SMS_ICC2:
+                String messageIndexIcc2 = url.getPathSegments().get(MESSAGE_ID);
+
+                return deleteMessageFromIcc(messageIndexIcc2, MSimConstants.SUB2);
 
             default:
                 throw new IllegalArgumentException("Unknown URL");
@@ -605,14 +644,22 @@ public class SmsProvider extends ContentProvider {
      * Delete the message at index from ICC.  Return true iff
      * successful.
      */
-    private int deleteMessageFromIcc(String messageIndexString) {
-        SmsManager smsManager = SmsManager.getDefault();
+    private int deleteMessageFromIcc(String messageIndexString, int subscription) {
         // use phone app permissions to avoid UID mismatch in AppOpsManager.noteOp() call
         long token = Binder.clearCallingIdentity();
         try {
-            return smsManager.deleteMessageFromIcc(
-                    Integer.parseInt(messageIndexString))
-                    ? 1 : 0;
+            if (subscription == MSimConstants.INVALID_SUBSCRIPTION) {
+                SmsManager smsManager = SmsManager.getDefault();
+                return smsManager.deleteMessageFromIcc(
+                        Integer.parseInt(messageIndexString))
+                        ? DELETE_SUCCESS : DELETE_FAIL;
+            } else {
+                MSimSmsManager mSimSmsManager = MSimSmsManager.getDefault();
+
+                return mSimSmsManager.deleteMessageFromIcc(
+                        Integer.parseInt(messageIndexString), subscription)
+                        ? DELETE_SUCCESS : DELETE_FAIL;
+            }
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException(
                     "Bad SMS ICC ID: " + messageIndexString);
@@ -742,6 +789,10 @@ public class SmsProvider extends ContentProvider {
     private static final int SMS_FAILED_ID = 25;
     private static final int SMS_QUEUED = 26;
     private static final int SMS_UNDELIVERED = 27;
+    private static final int SMS_ALL_ICC1 = 28;
+    private static final int SMS_ICC1 = 29;
+    private static final int SMS_ALL_ICC2 = 30;
+    private static final int SMS_ICC2 = 31;
 
     private static final UriMatcher sURLMatcher =
             new UriMatcher(UriMatcher.NO_MATCH);
@@ -772,6 +823,10 @@ public class SmsProvider extends ContentProvider {
         sURLMatcher.addURI("sms", "sr_pending", SMS_STATUS_PENDING);
         sURLMatcher.addURI("sms", "icc", SMS_ALL_ICC);
         sURLMatcher.addURI("sms", "icc/#", SMS_ICC);
+        sURLMatcher.addURI("sms", "icc1", SMS_ALL_ICC1);
+        sURLMatcher.addURI("sms", "icc1/#", SMS_ICC1);
+        sURLMatcher.addURI("sms", "icc2", SMS_ALL_ICC2);
+        sURLMatcher.addURI("sms", "icc2/#", SMS_ICC2);
         //we keep these for not breaking old applications
         sURLMatcher.addURI("sms", "sim", SMS_ALL_ICC);
         sURLMatcher.addURI("sms", "sim/#", SMS_ICC);
