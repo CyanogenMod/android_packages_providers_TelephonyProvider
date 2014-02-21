@@ -32,6 +32,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
 import android.os.Environment;
+import android.os.SystemProperties;
 import android.provider.Telephony;
 import android.text.TextUtils;
 import android.util.Log;
@@ -155,7 +156,9 @@ public class TelephonyProvider extends ContentProvider
 
         private int getDefaultPreferredApnId(SQLiteDatabase db) {
             int id = -1;
-            String configPref = mContext.getResources().getString(R.string.config_preferred_apn, "");
+            String configPref = (!SystemProperties.get("ro.preferred_apn", "").isEmpty() ?
+                SystemProperties.get("ro.preferred_apn", "") :
+                mContext.getResources().getString(R.string.config_preferred_apn, ""));
             if (!TextUtils.isEmpty(configPref)) {
                 String[] s = configPref.split(",");
                 if (s.length == 3) {
@@ -440,7 +443,9 @@ public class TelephonyProvider extends ContentProvider
 
     private long getDefaultPreferredApnId() {
         long id = -1;
-        String configPref = getContext().getResources().getString(R.string.config_preferred_apn, "");
+        String configPref = (!SystemProperties.get("ro.preferred_apn", "").isEmpty() ?
+            SystemProperties.get("ro.preferred_apn", "") :
+            getContext().getResources().getString(R.string.config_preferred_apn, ""));
         if (!TextUtils.isEmpty(configPref)) {
             String[] s = configPref.split(",");
             if (s.length == 3) {
