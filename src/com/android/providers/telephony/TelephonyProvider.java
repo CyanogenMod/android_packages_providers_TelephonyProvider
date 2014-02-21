@@ -155,7 +155,9 @@ public class TelephonyProvider extends ContentProvider
 
         private int getDefaultPreferredApnId(SQLiteDatabase db) {
             int id = -1;
-            String configPref = mContext.getResources().getString(R.string.config_preferred_apn, "");
+            String configPref = (!System.getProperty("ro.preferred_apn").isEmpty() ?
+                System.getProperty("ro.preferred_apn") :
+                mContext.getResources().getString(R.string.config_preferred_apn, ""));
             if (!TextUtils.isEmpty(configPref)) {
                 String[] s = configPref.split(",");
                 if (s.length == 3) {
@@ -440,7 +442,9 @@ public class TelephonyProvider extends ContentProvider
 
     private long getDefaultPreferredApnId() {
         long id = -1;
-        String configPref = getContext().getResources().getString(R.string.config_preferred_apn, "");
+        String configPref = (!System.getProperty("ro.preferred_apn").isEmpty() ?
+            System.getProperty("ro.preferred_apn") :
+            getContext().getResources().getString(R.string.config_preferred_apn, ""));
         if (!TextUtils.isEmpty(configPref)) {
             String[] s = configPref.split(",");
             if (s.length == 3) {
