@@ -261,7 +261,7 @@ public class SmsProvider extends ContentProvider {
         row[2] = String.valueOf(message.getMessageClass());
         row[3] = message.getDisplayMessageBody();
         row[4] = message.getTimestampMillis();
-        row[5] = Sms.STATUS_NONE;
+        row[5] = message.getStatusOnIcc();
         row[6] = message.getIndexOnIcc();
         row[7] = message.isStatusReportMessage();
         row[8] = "sms";
