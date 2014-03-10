@@ -271,7 +271,9 @@ public class SmsProvider extends ContentProvider {
         }
         Object[] row = new Object[13];
         row[0] = message.getServiceCenterAddress();
-        row[1] = message.getDisplayOriginatingAddress();
+        row[1] = (type == Sms.MESSAGE_TYPE_INBOX)
+                ? message.getDisplayOriginatingAddress()
+                : message.getRecipientAddress();
         row[2] = String.valueOf(message.getMessageClass());
         row[3] = message.getDisplayMessageBody();
         row[4] = message.getTimestampMillis();
