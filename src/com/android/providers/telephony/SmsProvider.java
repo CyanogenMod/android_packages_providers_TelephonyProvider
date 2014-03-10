@@ -255,17 +255,31 @@ public class SmsProvider extends ContentProvider {
     private Object[] convertIccToSms(SmsMessage message, int id) {
         // N.B.: These calls must appear in the same order as the
         // columns appear in ICC_COLUMNS.
+        int statusOnIcc = message.getStatusOnIcc();
+        int type = Sms.MESSAGE_TYPE_ALL;
+        switch (statusOnIcc) {
+            case SmsManager.STATUS_ON_ICC_READ:
+            case SmsManager.STATUS_ON_ICC_UNREAD:
+                type = Sms.MESSAGE_TYPE_INBOX;
+                break;
+            case SmsManager.STATUS_ON_ICC_SENT:
+                type = Sms.MESSAGE_TYPE_SENT;
+                break;
+            case SmsManager.STATUS_ON_ICC_UNSENT:
+                type = Sms.MESSAGE_TYPE_OUTBOX;
+                break;
+        }
         Object[] row = new Object[13];
         row[0] = message.getServiceCenterAddress();
         row[1] = message.getDisplayOriginatingAddress();
         row[2] = String.valueOf(message.getMessageClass());
         row[3] = message.getDisplayMessageBody();
         row[4] = message.getTimestampMillis();
-        row[5] = message.getStatusOnIcc();
+        row[5] = statusOnIcc;
         row[6] = message.getIndexOnIcc();
         row[7] = message.isStatusReportMessage();
         row[8] = "sms";
-        row[9] = TextBasedSmsColumns.MESSAGE_TYPE_ALL;
+        row[9] = type;
         row[10] = 0;      // locked
         row[11] = 0;      // error_code
         row[12] = id;
