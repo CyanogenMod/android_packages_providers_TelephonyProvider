@@ -838,8 +838,14 @@ public class MmsProvider extends ContentProvider {
         }
         try {
             File filePath = new File(path);
+            File appDataDirPath = new File(getContext().getApplicationInfo().dataDir
+                    + "/app_parts/");
+            // use canonical path to determin whether two paths point to the
+            // same file, because it
+            // will change symbolic link to canonical paths when comparing
+            // the paths.
             if (!filePath.getCanonicalPath()
-                    .startsWith(getContext().getApplicationInfo().dataDir + "/app_parts/")) {
+                    .startsWith(appDataDirPath.getCanonicalPath())) {
                 return null;
             }
         } catch (IOException e) {
