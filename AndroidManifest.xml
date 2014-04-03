@@ -33,11 +33,12 @@
                   android:exported="true"
                   android:multiprocess="false" />
 
-        <!-- TODO: permission -->
         <provider android:name="BlacklistProvider"
                   android:authorities="blacklist"
                   android:exported="true"
-                  android:multiprocess="true" />
+                  android:multiprocess="true"
+                  android:readPermission="android.permission.READ_PHONE_BLACKLIST"
+                  android:writePermission="android.permission.CHANGE_PHONE_BLACKLIST" />
 
         <provider android:name="SmsProvider"
                   android:authorities="sms"
