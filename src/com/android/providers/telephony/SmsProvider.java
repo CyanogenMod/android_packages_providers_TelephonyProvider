@@ -84,7 +84,8 @@ public class SmsProvider extends ContentProvider {
         "type",                         // Always MESSAGE_TYPE_ALL.
         "locked",                       // Always 0 (false).
         "error_code",                   // Always 0
-        "_id"
+        "_id",
+        "sub_id"
     };
 
     @Override
@@ -252,7 +253,7 @@ public class SmsProvider extends ContentProvider {
         return ret;
     }
 
-    private Object[] convertIccToSms(SmsMessage message, int id) {
+    private Object[] convertIccToSms(SmsMessage message, int id, int subscription) {
         // N.B.: These calls must appear in the same order as the
         // columns appear in ICC_COLUMNS.
         int statusOnIcc = message.getStatusOnIcc();
@@ -269,7 +270,7 @@ public class SmsProvider extends ContentProvider {
                 type = Sms.MESSAGE_TYPE_OUTBOX;
                 break;
         }
-        Object[] row = new Object[13];
+        Object[] row = new Object[14];
         row[0] = message.getServiceCenterAddress();
         row[1] = (type == Sms.MESSAGE_TYPE_INBOX)
                 ? message.getDisplayOriginatingAddress()
@@ -285,6 +286,7 @@ public class SmsProvider extends ContentProvider {
         row[10] = 0;      // locked
         row[11] = 0;      // error_code
         row[12] = id;
+        row[13] = subscription;
         return row;
     }
 
@@ -310,7 +312,7 @@ public class SmsProvider extends ContentProvider {
                         "Message not retrieved. ID: " + messageIndexString);
             }
             MatrixCursor cursor = new MatrixCursor(ICC_COLUMNS, 1);
-            cursor.addRow(convertIccToSms(message, 0));
+            cursor.addRow(convertIccToSms(message, 0, subscription));
             return withIccNotificationUri(cursor);
         } catch (NumberFormatException exception) {
             throw new IllegalArgumentException(
@@ -342,7 +344,7 @@ public class SmsProvider extends ContentProvider {
         for (int i = 0; i < count; i++) {
             SmsMessage message = messages.get(i);
             if (message != null) {
-                cursor.addRow(convertIccToSms(message, i));
+                cursor.addRow(convertIccToSms(message, i, subscription));
             }
         }
         return withIccNotificationUri(cursor);
