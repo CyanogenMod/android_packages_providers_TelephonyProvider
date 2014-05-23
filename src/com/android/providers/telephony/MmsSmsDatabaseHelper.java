@@ -123,7 +123,6 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                         PDU_UPDATE_THREAD_READ_BODY +
                         "END;";
 
-
     // When a part is inserted, if it is not text/plain or application/smil
     // (which both can exist with text-only MMSes), then there is an attachment.
     // Set has_attachment=1 in the threads table for the thread in question.
@@ -703,10 +702,6 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         db.execSQL("CREATE TRIGGER mms_words_update AFTER UPDATE ON part BEGIN UPDATE words " +
                 " SET index_text = NEW.text WHERE (source_id=NEW._id AND table_to_use=2); " +
                 " END;");
-
-        db.execSQL("DROP TRIGGER IF EXISTS mms_words_delete");
-        db.execSQL("CREATE TRIGGER mms_words_delete AFTER DELETE ON part BEGIN DELETE FROM " +
-                " words WHERE source_id = OLD._id AND table_to_use = 2; END;");
 
         // Updates threads table whenever a message in pdu is updated.
         db.execSQL("DROP TRIGGER IF EXISTS pdu_update_thread_date_subject_on_update");
@@ -1315,7 +1310,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
 
         updateThreadsAttachmentColumn(db);
 
-        // Add insert and delete triggers for keeping it up to date.
+        // Add insert triggers for keeping it up to date.
         db.execSQL(PART_UPDATE_THREADS_ON_INSERT_TRIGGER);
     }
 
