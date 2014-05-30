@@ -1176,8 +1176,13 @@ public class MmsSmsProvider extends ContentProvider {
 
         SQLiteQueryBuilder unionQueryBuilder = new SQLiteQueryBuilder();
         String unionQuery = null;
-        unionQuery = unionQueryBuilder.buildUnionQuery(new String[] {
-                mmsSubQuery, smsSubQuery }, null, null);
+        if (isMmsSelecttion(selection)) {
+            unionQuery = mmsSubQuery;
+        } else {
+            unionQuery = unionQueryBuilder.buildUnionQuery(new String[] {
+                    mmsSubQuery, smsSubQuery
+            }, null, null);
+        }
         if (DEBUG) {
             Log.w(LOG_TAG, "buildMailboxMsgQuery : unionQuery = " + unionQuery);
         }
