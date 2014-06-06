@@ -83,6 +83,9 @@ public class TelephonyProvider extends ContentProvider
     private static final String NUMERIC_ADD_DEFAULT_REGEX = "\\($1 or numeric = '000000'\\)";
     private static final String NUMERIC_VMCCMNC_REGEX_PT1 = "\\($1 and \\(v_mccmnc " +
         "= '000000' or v_mccmnc = '";
+
+    private static final String VISIT_AREA = "visit_area";
+
     private static boolean sConfigDefaultApnEnabled;
     private static boolean sConfigRoamingAreaApnRestrictionEnabled;
 
@@ -168,6 +171,7 @@ public class TelephonyProvider extends ContentProvider
                     "read_only BOOLEAN DEFAULT 0," +
                     "ppp_number TEXT," +
                     "localized_name TEXT," +
+                    "visit_area TEXT," +
                     "v_mccmnc TEXT);");
 
             initDatabase(db);
@@ -333,6 +337,7 @@ public class TelephonyProvider extends ContentProvider
                              parser.getAttributeValue(null, "ppp_number"));
             map.put(mContext.getString(R.string.localized_name),
                     parser.getAttributeValue(null, "localized_name"));
+            map.put(VISIT_AREA, parser.getAttributeValue(null, "visit_area"));
 
             // do not add NULL to the map so that insert() will set the default value
             String proxy = parser.getAttributeValue(null, "proxy");
