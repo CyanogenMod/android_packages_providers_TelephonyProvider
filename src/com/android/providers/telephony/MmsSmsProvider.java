@@ -118,14 +118,14 @@ public class MmsSmsProvider extends ContentProvider {
     // SMS ("sms") message tables.
     private static final String[] MMS_SMS_COLUMNS =
             { BaseColumns._ID, Mms.DATE, Mms.DATE_SENT, Mms.READ, Mms.THREAD_ID,
-              Mms.LOCKED, Mms.SUB_ID };
+              Mms.LOCKED, Mms.SUB_ID, Mms.PRIORITY };
 
     // These are the columns that appear only in the MMS message
     // table.
     private static final String[] MMS_ONLY_COLUMNS = {
         Mms.CONTENT_CLASS, Mms.CONTENT_LOCATION, Mms.CONTENT_TYPE,
         Mms.DELIVERY_REPORT, Mms.EXPIRY, Mms.MESSAGE_CLASS, Mms.MESSAGE_ID,
-        Mms.MESSAGE_SIZE, Mms.MESSAGE_TYPE, Mms.MESSAGE_BOX, Mms.PRIORITY,
+        Mms.MESSAGE_SIZE, Mms.MESSAGE_TYPE, Mms.MESSAGE_BOX,
         Mms.READ_STATUS, Mms.RESPONSE_STATUS, Mms.RESPONSE_TEXT,
         Mms.RETRIEVE_STATUS, Mms.RETRIEVE_TEXT_CHARSET, Mms.REPORT_ALLOWED,
         Mms.READ_REPORT, Mms.STATUS, Mms.SUBJECT, Mms.SUBJECT_CHARSET,
@@ -135,7 +135,7 @@ public class MmsSmsProvider extends ContentProvider {
     // table.
     private static final String[] SMS_ONLY_COLUMNS =
             { "address", "body", "person", "reply_path_present",
-              "service_center", "status", "subject", "type", "error_code", "pri" };
+              "service_center", "status", "subject", "type", "error_code" };
 
     // These are all the columns that appear in the "threads" table.
     private static final String[] THREADS_COLUMNS = {
