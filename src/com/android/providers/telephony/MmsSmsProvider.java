@@ -105,6 +105,7 @@ public class MmsSmsProvider extends ContentProvider {
     public static final int SEARCH_MODE_CONTENT = 0;
     public static final int SEARCH_MODE_NAME    = 1;
     public static final int SEARCH_MODE_NUMBER  = 2;
+    public static final int SEARCH_MODE_SUBJECT = 3;
 
     // add for different match mode in classify search
     public static final int MATCH_BY_ADDRESS = 0;
@@ -279,6 +280,18 @@ public class MmsSmsProvider extends ContentProvider {
 
     private static final String MMS_PROJECTION = "'mms' AS transport_type, pdu._id, thread_id,"
             + "addr.address AS address, part.text as body, sub_id,"
+            + "pdu.date * 1000 AS date, date_sent, read, NULL AS type,"
+            + "NULL AS status, locked, NULL AS error_code,"
+            + "sub, sub_cs, date, date_sent, read,"
+            + "m_type,"
+            + "pdu.msg_box AS msg_box,"
+            + "d_rpt, rr, NULL AS err_type,"
+            + "locked, NULL AS st, NULL AS text_only,"
+            + "sub_id, NULL AS recipient_ids";
+
+    private static final String MMS_PROJECTION_FOR_SUBJECT_SEARCH =
+            "'mms' AS transport_type, pdu._id, thread_id,"
+            + "addr.address AS address, pdu.sub as body, sub_id,"
             + "pdu.date * 1000 AS date, date_sent, read, NULL AS type,"
             + "NULL AS status, locked, NULL AS error_code,"
             + "sub, sub_cs, date, date_sent, read,"
@@ -1718,6 +1731,13 @@ public class MmsSmsProvider extends ContentProvider {
                     "(body like ? escape '" + SEARCH_ESCAPE_CHARACTER + "')) GROUP BY pdu._id",
                     MMS_PROJECTION,
                     PduHeaders.TO);
+        } else if (searchMode == SEARCH_MODE_SUBJECT) {
+            mmsQuery = String.format(
+                    "SELECT %s FROM pdu,addr WHERE (" +
+                    "(addr.msg_id = pdu._id)  AND (addr.type=%d) AND " +
+                    "(body like ? escape '" + SEARCH_ESCAPE_CHARACTER + "')) GROUP BY pdu._id",
+                    MMS_PROJECTION_FOR_SUBJECT_SEARCH,
+                    PduHeaders.TO);
         } else if (searchMode == SEARCH_MODE_NUMBER && matchWhole == MATCH_BY_ADDRESS) {
             smsQuery = String.format(
                     "SELECT %s FROM sms WHERE (address LIKE ?)",
@@ -1753,6 +1773,9 @@ public class MmsSmsProvider extends ContentProvider {
             strArray = new String[] {
                     searchString, searchString
             };
+        } else if (searchMode == SEARCH_MODE_SUBJECT) {
+            rawQuery = String.format("%s  ORDER BY date DESC", mmsQuery);
+            strArray = new String[] {searchString};
         } else {
             strArray = EMPTY_STRING_ARRAY;
         }
