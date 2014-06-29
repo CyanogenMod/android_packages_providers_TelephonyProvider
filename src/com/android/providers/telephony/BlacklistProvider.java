@@ -21,7 +21,6 @@ import android.content.ContentProvider;
 import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
-import android.content.Intent;
 import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -30,6 +29,7 @@ import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
 import android.provider.Telephony.Blacklist;
 import android.telephony.PhoneNumberUtils;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -38,7 +38,7 @@ public class BlacklistProvider extends ContentProvider {
     private static final boolean DEBUG = true;
 
     private static final String DATABASE_NAME = "blacklist.db";
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 4;
 
     private static final String BLACKLIST_TABLE = "blacklist";
     private static final String COLUMN_NORMALIZED = "normalized_number";
@@ -92,9 +92,10 @@ public class BlacklistProvider extends ContentProvider {
                         " SELECT * FROM " + BLACKLIST_TABLE + "_old;");
             }
 
-            if (oldVersion < 3) {
+            if (oldVersion < 4) {
                 // update the normalized number column, v1 and v2 didn't handle
                 // alphanumeric 'numbers' correctly
+                // v3 doesn't handle E164 format, that uses in v4 to normalize the numbers
 
                 Cursor rows = db.query(BLACKLIST_TABLE,
                         new String[] { Blacklist._ID, Blacklist.NUMBER },
@@ -109,7 +110,7 @@ public class BlacklistProvider extends ContentProvider {
                         while (rows.moveToNext()) {
                             rowId[0] = rows.getString(0);
                             cv.clear();
-                            cv.put(COLUMN_NORMALIZED, normalizeNumber(rows.getString(1)));
+                            cv.put(COLUMN_NORMALIZED, normalizeNumber(mContext, rows.getString(1)));
                             db.update(BLACKLIST_TABLE, cv, Blacklist._ID + "= ?", rowId);
                         }
                     }
@@ -154,7 +155,7 @@ public class BlacklistProvider extends ContentProvider {
                 qb.appendWhere(Blacklist._ID + " = " + uri.getLastPathSegment());
                 break;
             case BL_NUMBER: {
-                String number = normalizeNumber(uri.getLastPathSegment());
+                String number = normalizeNumber(getContext(), uri.getLastPathSegment());
                 boolean regex = uri.getBooleanQueryParameter(Blacklist.REGEX_KEY, false);
 
                 if (regex) {
@@ -258,7 +259,7 @@ public class BlacklistProvider extends ContentProvider {
                             "Cannot delete URI " + uri + " with a where clause");
                 }
                 where = COLUMN_NORMALIZED + " = ?";
-                whereArgs = new String[] { normalizeNumber(uri.getLastPathSegment()) };
+                whereArgs = new String[] { normalizeNumber(getContext(), uri.getLastPathSegment()) };
                 break;
             default:
                 throw new UnsupportedOperationException("Cannot delete that URI: " + uri);
@@ -303,7 +304,7 @@ public class BlacklistProvider extends ContentProvider {
                 db.beginTransaction();
                 try {
                     count = db.update(BLACKLIST_TABLE, values, COLUMN_NORMALIZED + " = ?",
-                            new String[] { normalizeNumber(uriNumber) });
+                            new String[] { normalizeNumber(getContext(), uriNumber) });
                     if (count == 0) {
                         // convenience: fall back to insert if number wasn't present
                         if (db.insert(BLACKLIST_TABLE, null, values) > 0) {
@@ -355,7 +356,7 @@ public class BlacklistProvider extends ContentProvider {
                 return null;
             }
 
-            String normalizedNumber = normalizeNumber(number);
+            String normalizedNumber = normalizeNumber(getContext(), number);
             boolean isRegex = normalizedNumber.indexOf('%') >= 0
                     || normalizedNumber.indexOf('_') >= 0;
 
@@ -373,7 +374,7 @@ public class BlacklistProvider extends ContentProvider {
 
     // mostly a copy of PhoneNumberUtils.normalizeNumber,
     // with the exception of support for regex characters
-    private static String normalizeNumber(String number) {
+    private static String normalizeNumber(Context ctx, String number) {
         int len = number.length();
         StringBuilder ret = new StringBuilder(len);
 
@@ -384,7 +385,7 @@ public class BlacklistProvider extends ContentProvider {
             if (digit != -1) {
                 ret.append(digit);
             } else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
-                return normalizeNumber(PhoneNumberUtils.convertKeypadLettersToDigits(number));
+                return normalizeNumber(ctx, PhoneNumberUtils.convertKeypadLettersToDigits(number));
             } else if (i == 0 && c == '+') {
                 ret.append(c);
             } else if (c == '*') {
@@ -396,6 +397,23 @@ public class BlacklistProvider extends ContentProvider {
             }
         }
 
-        return ret.toString();
+        return toE164Number(ctx, ret.toString());
+    }
+
+    private static String toE164Number(Context ctx, String src) {
+        // Try to retrieve the current ISO Country code
+        TelephonyManager tm = (TelephonyManager) ctx.getSystemService(
+                Context.TELEPHONY_SERVICE);
+        String countryCode = tm.getSimCountryIso();
+        if (TextUtils.isEmpty(countryCode)) {
+            countryCode = ctx.getResources().getConfiguration().locale.getCountry();
+        } else {
+            countryCode = new java.util.Locale("", countryCode).getCountry();
+        }
+        String e164Number = PhoneNumberUtils.formatNumberToE164(src, countryCode);
+        if (e164Number != null) {
+            return e164Number;
+        }
+        return src;
     }
 }
