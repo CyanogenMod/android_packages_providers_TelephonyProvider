@@ -26,4 +26,7 @@
 
     <!-- v_mccmnc -->
     <string name="v_mccmnc">v_mccmnc</string>
+
+    <!-- default protocol -->
+    <string name="default_protocol">IP</string>
 </resources>
