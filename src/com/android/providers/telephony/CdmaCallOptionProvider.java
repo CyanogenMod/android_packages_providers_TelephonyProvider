@@ -59,6 +59,7 @@ public class CdmaCallOptionProvider extends ContentProvider {
     private static final int CFNOREPLY       = 2;
     private static final int CFNOREACHABLE   = 3;
     private static final int CFDEACTIVATEALL = 4;
+    private static final int CALLWAITING = 6;
 
     // call option state: activate, deactivate
     private static final int ACTIVATE = 1;
@@ -70,6 +71,7 @@ public class CdmaCallOptionProvider extends ContentProvider {
     private static final int URL_CFNRY = 4;
     private static final int URL_CFNRC = 5;
     private static final int URL_CFDA = 6;
+    private static final int URL_CW = 7;
 
     private static final String TAG = "CdmaCallOptionProvider";
     private static final String CALL_OPTION_TABLE = "calloption";
@@ -85,6 +87,7 @@ public class CdmaCallOptionProvider extends ContentProvider {
         s_urlMatcher.addURI("cdma", "calloption/cfnry", URL_CFNRY);
         s_urlMatcher.addURI("cdma", "calloption/cfnrc", URL_CFNRC);
         s_urlMatcher.addURI("cdma", "calloption/cfda", URL_CFDA);
+        s_urlMatcher.addURI("cdma", "calloption/cw", URL_CW);
     }
 
     private static class DatabaseHelper extends SQLiteOpenHelper {
@@ -274,6 +277,11 @@ public class CdmaCallOptionProvider extends ContentProvider {
                 break;
             }
 
+            case URL_CW: {
+                qb.appendWhere("type = " + CALLWAITING);
+                break;
+            }
+
             default: {
                 return null;
             }
@@ -333,6 +341,11 @@ public class CdmaCallOptionProvider extends ContentProvider {
             case URL_CFDA: {
                 values.put(Telephony.CdmaCallOptions.TYPE, CFDEACTIVATEALL);
                 values.put(Telephony.CdmaCallOptions.STATE, DEACTIVATE);
+                values.put(Telephony.CdmaCallOptions.CATEGORY, -1);
+                break;
+            }
+            case URL_CW: {
+                values.put(Telephony.CdmaCallOptions.TYPE, CALLWAITING);
                 values.put(Telephony.CdmaCallOptions.CATEGORY, -1);
                 break;
             }
