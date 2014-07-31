@@ -31,4 +31,6 @@
     <!-- Apn read only -->
     <string name="read_only">read_only</string>
 
+    <!-- Apn PPP number -->
+    <string name="ppp_number">ppp_number</string>
 </resources>
