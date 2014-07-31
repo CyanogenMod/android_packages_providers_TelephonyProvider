@@ -87,6 +87,7 @@ public class TelephonyProvider extends ContentProvider
     private static final String PARTNER_APNS_PATH = "etc/apns-conf.xml";
 
     private static final String READ_ONLY = "read_only";
+    private static final String LOCALIZED_NAME = "localized_name";
 
     private static final UriMatcher s_urlMatcher = new UriMatcher(UriMatcher.NO_MATCH);
 
@@ -241,6 +242,7 @@ public class TelephonyProvider extends ContentProvider
                     "max_conns_time INTEGER default 0," +
                     "read_only BOOLEAN DEFAULT 0," +
                     "ppp_number TEXT," +
+                    "localized_name TEXT," +
                     "mtu INTEGER);");
              /* FIXME Currenlty sub_id is column is not used for query purpose.
              This would be modified to more appropriate default value later. */
@@ -412,6 +414,8 @@ public class TelephonyProvider extends ContentProvider
             map.put(Telephony.Carriers.PASSWORD, parser.getAttributeValue(null, "password"));
             map.put(mContext.getString(R.string.ppp_number),
                     parser.getAttributeValue(null, "ppp_number"));
+            map.put(mContext.getString(R.string.localized_name),
+                    parser.getAttributeValue(null, "localized_name"));
 
             // do not add NULL to the map so that insert() will set the default value
             String proxy = parser.getAttributeValue(null, "proxy");
@@ -615,6 +619,9 @@ public class TelephonyProvider extends ContentProvider
 
             if (values.containsKey(READ_ONLY) == false) {
                 values.put(READ_ONLY, false);
+            }
+            if (!values.containsKey(LOCALIZED_NAME)) {
+                values.put(LOCALIZED_NAME, "");
             }
             return values;
         }
