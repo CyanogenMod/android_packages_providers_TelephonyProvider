@@ -86,6 +86,8 @@ public class TelephonyProvider extends ContentProvider
 
     private static final String PARTNER_APNS_PATH = "etc/apns-conf.xml";
 
+    private static final String READ_ONLY = "read_only";
+
     private static final UriMatcher s_urlMatcher = new UriMatcher(UriMatcher.NO_MATCH);
 
     private static final ContentValues s_currentNullMap;
@@ -237,6 +239,7 @@ public class TelephonyProvider extends ContentProvider
                     "max_conns INTEGER default 0," +
                     "wait_time INTEGER default 0," +
                     "max_conns_time INTEGER default 0," +
+                    "read_only BOOLEAN DEFAULT 0," +
                     "ppp_number TEXT," +
                     "mtu INTEGER);");
              /* FIXME Currenlty sub_id is column is not used for query purpose.
@@ -497,6 +500,12 @@ public class TelephonyProvider extends ContentProvider
                 map.put(Telephony.Carriers.MTU, Integer.parseInt(mtu));
             }
 
+            String readOnly = parser.getAttributeValue(null, "read_only");
+            if (readOnly != null) {
+                map.put(mContext.getString(R.string.read_only), Boolean.
+                        parseBoolean(readOnly));
+            }
+
             return map;
         }
 
@@ -604,6 +613,9 @@ public class TelephonyProvider extends ContentProvider
                 values.put(Telephony.Carriers.MAX_CONNS_TIME, 0);
             }
 
+            if (values.containsKey(READ_ONLY) == false) {
+                values.put(READ_ONLY, false);
+            }
             return values;
         }
 
