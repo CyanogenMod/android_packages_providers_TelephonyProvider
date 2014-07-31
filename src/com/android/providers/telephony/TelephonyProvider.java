@@ -237,6 +237,7 @@ public class TelephonyProvider extends ContentProvider
                     "max_conns INTEGER default 0," +
                     "wait_time INTEGER default 0," +
                     "max_conns_time INTEGER default 0," +
+                    "ppp_number TEXT," +
                     "mtu INTEGER);");
              /* FIXME Currenlty sub_id is column is not used for query purpose.
              This would be modified to more appropriate default value later. */
@@ -406,6 +407,8 @@ public class TelephonyProvider extends ContentProvider
             map.put(Telephony.Carriers.USER, parser.getAttributeValue(null, "user"));
             map.put(Telephony.Carriers.SERVER, parser.getAttributeValue(null, "server"));
             map.put(Telephony.Carriers.PASSWORD, parser.getAttributeValue(null, "password"));
+            map.put(mContext.getString(R.string.ppp_number),
+                    parser.getAttributeValue(null, "ppp_number"));
 
             // do not add NULL to the map so that insert() will set the default value
             String proxy = parser.getAttributeValue(null, "proxy");

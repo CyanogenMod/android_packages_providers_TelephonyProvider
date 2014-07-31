@@ -28,4 +28,7 @@
          storage for SMS and MMS messages. [CHAR LIMIT=25] -->
     <string name="app_label" product="default">Phone/Messaging Storage</string>
 
+    <!-- Apn PPP number -->
+    <string name="ppp_number">ppp_number</string>
+
 </resources>
