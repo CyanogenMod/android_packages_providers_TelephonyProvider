@@ -28,4 +28,7 @@
          storage for SMS and MMS messages. [CHAR LIMIT=40] -->
     <string name="app_label" product="default">Phone and Messaging Storage</string>
 
+    <!-- Apn read only -->
+    <string name="read_only">read_only</string>
+
 </resources>

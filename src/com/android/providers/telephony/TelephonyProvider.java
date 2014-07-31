@@ -99,6 +99,8 @@ public class TelephonyProvider extends ContentProvider
     private static final String OTA_UPDATED_APNS_PATH = "misc/apns-conf.xml";
     private static final String OLD_APNS_PATH = "etc/old-apns-conf.xml";
 
+    private static final String READ_ONLY = "read_only";
+
     private static final UriMatcher s_urlMatcher = new UriMatcher(UriMatcher.NO_MATCH);
 
     private static final ContentValues s_currentNullMap;
@@ -265,6 +267,7 @@ public class TelephonyProvider extends ContentProvider
                     "max_conns_time INTEGER DEFAULT 0," +
                     "mtu INTEGER DEFAULT 0," +
                     "edited INTEGER DEFAULT " + Telephony.Carriers.UNEDITED + "," +
+                    "read_only BOOLEAN DEFAULT 0," +
                     // Uniqueness collisions are used to trigger merge code so if a field is listed
                     // here it means we will accept both (user edited + new apn_conf definition)
                     // Columns not included in UNIQUE constraint: name, current, edited,
@@ -934,6 +937,7 @@ public class TelephonyProvider extends ContentProvider
 
             addBoolAttribute(parser, "carrier_enabled", map, Telephony.Carriers.CARRIER_ENABLED);
             addBoolAttribute(parser, "modem_cognitive", map, Telephony.Carriers.MODEM_COGNITIVE);
+            addBoolAttribute(parser, "read_only", map, mContext.getString(R.string.read_only));
 
             String bearerList = parser.getAttributeValue(null, "bearer_bitmask");
             if (bearerList != null) {
