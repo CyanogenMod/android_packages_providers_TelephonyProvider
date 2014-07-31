@@ -33,4 +33,7 @@
 
     <!-- Apn PPP number -->
     <string name="ppp_number">ppp_number</string>
+
+    <!-- Apn localized name -->
+    <string name="localized_name">localized_name</string>
 </resources>
