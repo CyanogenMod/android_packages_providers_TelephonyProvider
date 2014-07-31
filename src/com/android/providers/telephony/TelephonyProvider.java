@@ -89,6 +89,7 @@ public class TelephonyProvider extends ContentProvider
     private static final String PARTNER_APNS_PATH = "etc/apns-conf.xml";
 
     private static final String READ_ONLY = "read_only";
+
     private static final String LOCALIZED_NAME = "localized_name";
 
     private static final String VISIT_AREA = "visit_area";
@@ -437,6 +438,9 @@ public class TelephonyProvider extends ContentProvider
                                 " The table will get created in onOpen.");
                     }
                 }
+                // Update carriers table adding read_only column
+                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                        " ADD COLUMN read_only BOOLEAN DEFAULT 0;");
                 oldVersion = 17 << 16 | 6;
             }
             if (DBG) {
@@ -683,6 +687,7 @@ public class TelephonyProvider extends ContentProvider
             if (values.containsKey(READ_ONLY) == false) {
                 values.put(READ_ONLY, false);
             }
+
             if (!values.containsKey(LOCALIZED_NAME)) {
                 values.put(LOCALIZED_NAME, "");
             }
