@@ -100,6 +100,7 @@ public class MmsSmsProvider extends ContentProvider {
     private static final int URI_FIRST_LOCKED_MESSAGE_BY_THREAD_ID = 17;
     private static final int URI_MESSAGE_ID_TO_THREAD              = 18;
     private static final int URI_MAILBOX_MESSAGES                  = 19;
+    private static final int URI_MESSAGES_COUNT            = 22;
 
     /**
      * the name of the table that is used to store the queue of
@@ -256,6 +257,9 @@ public class MmsSmsProvider extends ContentProvider {
         //"#" is the mailbox name id, such as inbox=1, sent=2, draft = 3 , outbox = 4
         URI_MATCHER.addURI(AUTHORITY, "mailbox/#", URI_MAILBOX_MESSAGES);
 
+        // URI for obtaining all short message count
+        URI_MATCHER.addURI(AUTHORITY, "messagescount", URI_MESSAGES_COUNT);
+
         // URI for deleting obsolete threads.
         URI_MATCHER.addURI(AUTHORITY, "conversations/obsolete", URI_OBSOLETE_THREADS);
 
@@ -363,6 +367,8 @@ public class MmsSmsProvider extends ContentProvider {
                         uri.getPathSegments().get(1), projection, selection,
                         selectionArgs, sortOrder, false, pduTable);
                 break;
+            case URI_MESSAGES_COUNT:
+                return getAllMessagesCount();
             case URI_CONVERSATIONS_RECIPIENTS:
                 cursor = getConversationById(
                         uri.getPathSegments().get(1), projection, selection,
@@ -1100,6 +1106,17 @@ public class MmsSmsProvider extends ContentProvider {
 
         return outerQueryBuilder.buildQuery(projection, null, null, null, null,
                 sortOrder, null);
+    }
+
+    /**
+     * Return the SMS messages count on phone
+     */
+    private Cursor getAllMessagesCount() {
+        String unionQuery = "select sum(a) AS count, 1 AS _id "
+                + "from (" + "select count(sms._id) as a, 2 AS b from sms, threads"
+                + " where thread_id NOTNULL AND thread_id = threads._id)";
+
+        return mOpenHelper.getReadableDatabase().rawQuery(unionQuery, EMPTY_STRING_ARRAY);
     }
 
     /**
