@@ -427,13 +427,14 @@ public class SmsProvider extends ContentProvider {
         final String callerPkg = getCallingPackage();
         long token = Binder.clearCallingIdentity();
         try {
-            return insertInner(url, initialValues, callerUid, callerPkg);
+            return insertInner(url, initialValues, callerUid, callerPkg, true);
         } finally {
             Binder.restoreCallingIdentity(token);
         }
     }
 
-    private Uri insertInner(Uri url, ContentValues initialValues, int callerUid, String callerPkg) {
+    private Uri insertInner(Uri url, ContentValues initialValues, int callerUid, String callerPkg,
+            boolean notify) {
         ContentValues values;
         long rowID;
         int type = Sms.MESSAGE_TYPE_ALL;
@@ -613,7 +614,9 @@ public class SmsProvider extends ContentProvider {
             if (Log.isLoggable(TAG, Log.VERBOSE)) {
                 Log.d(TAG, "insert " + uri + " succeeded");
             }
-            notifyChange(uri);
+            if (notify) {
+                notifyChange(uri);
+            }
             return uri;
         } else {
             Log.e(TAG,"insert: failed!");
@@ -716,6 +719,30 @@ public class SmsProvider extends ContentProvider {
 
             Binder.restoreCallingIdentity(token);
         }
+    }
+
+    @Override
+    public int bulkInsert(Uri uri, ContentValues[] values) {
+        SQLiteDatabase db = mOpenHelper.getReadableDatabase();
+        db.beginTransaction();
+        long token = Binder.clearCallingIdentity();
+        int numValues = values.length;
+        final int callerUid = Binder.getCallingUid();
+        final String callerPkg = getCallingPackage();
+        Log.d(TAG, "start bulkInsert uri: " + uri + " count: " + numValues);
+        try {
+            for (int i = 0; i < numValues; i++) {
+                insertInner(uri, values[i], callerUid, callerPkg, false);
+            }
+            notifyChange(uri);
+            db.setTransactionSuccessful();
+            Log.d(TAG, "bulkInsert successfully: ");
+        } finally {
+            db.endTransaction();
+            Binder.restoreCallingIdentity(token);
+            Log.d(TAG, "bulkInsert finish: ");
+        }
+        return numValues;
     }
 
     @Override

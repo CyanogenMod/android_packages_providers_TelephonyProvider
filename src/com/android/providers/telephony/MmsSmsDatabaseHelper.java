@@ -386,6 +386,54 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    private static void updateThreadDate(SQLiteDatabase db, long thread_id) {
+        if (thread_id <= 0) {
+            return;
+        }
+
+        try {
+            db.execSQL(
+            "  UPDATE threads" +
+            "  SET" +
+            "  date =" +
+            "    (SELECT date FROM" +
+            "        (SELECT date * 1000 AS date, thread_id FROM pdu" +
+            "         UNION SELECT date, thread_id FROM sms)" +
+            "     WHERE thread_id = " + thread_id + " ORDER BY date DESC LIMIT 1)" +
+            "  WHERE threads._id = " + thread_id + ";");
+        } catch (Throwable ex) {
+            Log.e(TAG, ex.getMessage(), ex);
+        }
+    }
+
+    public static void updateThreadsDate(SQLiteDatabase db, String where, String[] whereArgs) {
+        db.beginTransaction();
+        try {
+            if (where == null) {
+                where = "";
+            } else {
+                where = "WHERE (" + where + ")";
+            }
+            String query = "SELECT _id FROM threads " + where;
+            Cursor c = db.rawQuery(query, whereArgs);
+            if (c != null) {
+                try {
+                    Log.d(TAG, "updateThread count : " + c.getCount());
+                    while (c.moveToNext()) {
+                        updateThreadDate(db, c.getInt(0));
+                    }
+                } finally {
+                    c.close();
+                }
+            }
+            db.setTransactionSuccessful();
+        } catch (Throwable ex) {
+            Log.e(TAG, ex.getMessage(), ex);
+        } finally {
+            db.endTransaction();
+        }
+    }
+
     public static void updateAllThreads(SQLiteDatabase db, String where, String[] whereArgs) {
         db.beginTransaction();
         try {
