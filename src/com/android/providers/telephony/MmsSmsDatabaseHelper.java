@@ -592,7 +592,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    Mms.DELIVERY_TIME + " INTEGER," +
                    Mms.DELIVERY_REPORT + " INTEGER," +
                    Mms.LOCKED + " INTEGER DEFAULT 0," +
-                   Mms.SUB_ID + " INTEGER DEFAULT -1, " +
+                   Mms.PHONE_ID + " INTEGER DEFAULT -1, " +
                    Mms.SEEN + " INTEGER DEFAULT 0," +
                    Mms.CREATOR + " TEXT," +
                    Mms.TEXT_ONLY + " INTEGER DEFAULT 0" +
@@ -837,7 +837,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "body TEXT," +
                    "service_center TEXT," +
                    "locked INTEGER DEFAULT 0," +
-                   "sub_id INTEGER DEFAULT -1, " +
+                   "phone_id INTEGER DEFAULT -1, " +
                    "error_code INTEGER DEFAULT 0," +
                    "creator TEXT," +
                    "seen INTEGER DEFAULT 0," +
@@ -856,7 +856,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "sequence INTEGER," + // the part number of this message
                    "destination_port INTEGER," +
                    "address TEXT," +
-                   "sub_id INTEGER DEFAULT -1, " +
+                   "phone_id INTEGER DEFAULT -1, " +
                    "pdu TEXT);"); // the raw PDU for this part
 
         db.execSQL("CREATE TABLE attachments (" +
@@ -924,7 +924,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    PendingMessages.ERROR_CODE + " INTEGER," +
                    PendingMessages.RETRY_INDEX + " INTEGER NOT NULL DEFAULT 0," +
                    PendingMessages.DUE_TIME + " INTEGER," +
-                   PendingMessages.SUB_ID + " INTEGER DEFAULT 0, " +
+                   PendingMessages.PHONE_ID + " INTEGER DEFAULT 0, " +
                    PendingMessages.LAST_TRY + " INTEGER);");
 
     }
@@ -1532,13 +1532,13 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
 
     private void upgradeDatabaseToVersion58(SQLiteDatabase db) {
         db.execSQL("ALTER TABLE " + MmsProvider.TABLE_PDU +" ADD COLUMN "
-                + Mms.SUB_ID + " INTEGER DEFAULT -1");
+                + Mms.PHONE_ID + " INTEGER DEFAULT -1");
         db.execSQL("ALTER TABLE " + MmsSmsProvider.TABLE_PENDING_MSG +" ADD COLUMN "
-                + "pending_sub_id" + " INTEGER DEFAULT 0");
+                + "pending_phone_id" + " INTEGER DEFAULT 0");
         db.execSQL("ALTER TABLE " + SmsProvider.TABLE_SMS +" ADD COLUMN "
-                + Sms.SUB_ID + " INTEGER DEFAULT -1");
+                + Sms.PHONE_ID + " INTEGER DEFAULT -1");
         db.execSQL("ALTER TABLE " + SmsProvider.TABLE_RAW +" ADD COLUMN "
-                + Sms.SUB_ID + " INTEGER DEFAULT -1");
+                + Sms.PHONE_ID + " INTEGER DEFAULT -1");
     }
 
     private void upgradeDatabaseToVersion59(SQLiteDatabase db) {
@@ -1830,7 +1830,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 Mms.DELIVERY_TIME + " INTEGER," +
                 Mms.DELIVERY_REPORT + " INTEGER," +
                 Mms.LOCKED + " INTEGER DEFAULT 0," +
-                Mms.SUB_ID + " INTEGER DEFAULT -1," +
+                Mms.PHONE_ID + " INTEGER DEFAULT -1," +
                 Mms.SEEN + " INTEGER DEFAULT 0," +
                 Mms.TEXT_ONLY + " INTEGER DEFAULT 0" +
                 ");");
