@@ -595,6 +595,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    Mms.LOCKED + " INTEGER DEFAULT 0," +
                    Mms.SUBSCRIPTION_ID + " INTEGER DEFAULT "
                            + SubscriptionManager.INVALID_SUBSCRIPTION_ID + ", " +
+                   Mms.PHONE_ID + " INTEGER DEFAULT -1, " +
                    Mms.SEEN + " INTEGER DEFAULT 0," +
                    Mms.CREATOR + " TEXT," +
                    Mms.TEXT_ONLY + " INTEGER DEFAULT 0" +
@@ -849,6 +850,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "service_center TEXT," +
                    "locked INTEGER DEFAULT 0," +
                    "sub_id INTEGER DEFAULT " + SubscriptionManager.INVALID_SUBSCRIPTION_ID + ", " +
+                   "phone_id INTEGER DEFAULT -1, " +
                    "error_code INTEGER DEFAULT 0," +
                    "creator TEXT," +
                    "seen INTEGER DEFAULT 0" +
@@ -867,6 +869,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "destination_port INTEGER," +
                    "address TEXT," +
                    "sub_id INTEGER DEFAULT " + SubscriptionManager.INVALID_SUBSCRIPTION_ID + ", " +
+                   "phone_id INTEGER DEFAULT -1, " +
                    "pdu TEXT);"); // the raw PDU for this part
 
         db.execSQL("CREATE TABLE attachments (" +
@@ -943,6 +946,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    PendingMessages.DUE_TIME + " INTEGER," +
                    PendingMessages.SUBSCRIPTION_ID + " INTEGER DEFAULT " +
                            SubscriptionManager.INVALID_SUBSCRIPTION_ID + ", " +
+                   PendingMessages.PHONE_ID + " INTEGER DEFAULT 0, " +
                    PendingMessages.LAST_TRY + " INTEGER);");
 
     }
@@ -1604,7 +1608,18 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    Mms.MESSAGE_BOX + "=" + Mms.MESSAGE_BOX_SENT + ")" +
                    " AND " +
                    "(" + Mms.MESSAGE_TYPE + "!=" + PduHeaders.MESSAGE_TYPE_NOTIFICATION_IND + ");");
-
+        db.execSQL("ALTER TABLE " + MmsProvider.TABLE_PDU +
+                " ADD COLUMN " + Mms.PHONE_ID
+                + " INTEGER DEFAULT -1");
+        db.execSQL("ALTER TABLE " + MmsSmsProvider.TABLE_PENDING_MSG
+                +" ADD COLUMN " + "pending_sub_id"
+                + " INTEGER DEFAULT 0");
+        db.execSQL("ALTER TABLE " + SmsProvider.TABLE_SMS
+                + " ADD COLUMN " + Sms.PHONE_ID
+                + " INTEGER DEFAULT -1");
+        db.execSQL("ALTER TABLE " + SmsProvider.TABLE_RAW
+                +" ADD COLUMN " + Sms.PHONE_ID
+                + " INTEGER DEFAULT -1");
     }
 
     @Override
@@ -1886,6 +1901,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 Mms.LOCKED + " INTEGER DEFAULT 0," +
                 Mms.SUBSCRIPTION_ID + " INTEGER DEFAULT "
                         + SubscriptionManager.INVALID_SUBSCRIPTION_ID + ", " +
+                Mms.PHONE_ID + " INTEGER DEFAULT -1," +
                 Mms.SEEN + " INTEGER DEFAULT 0," +
                 Mms.TEXT_ONLY + " INTEGER DEFAULT 0" +
                 ");");
