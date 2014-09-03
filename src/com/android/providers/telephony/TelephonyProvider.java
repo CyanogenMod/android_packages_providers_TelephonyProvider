@@ -62,7 +62,7 @@ public class TelephonyProvider extends ContentProvider
     private static final String DATABASE_NAME = "telephony.db";
     private static final boolean DBG = true;
 
-    private static final int DATABASE_VERSION = 10 << 16;
+    private static final int DATABASE_VERSION = 15 << 16;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
     private static final int URL_ID = 3;
@@ -306,6 +306,51 @@ public class TelephonyProvider extends ContentProvider
                     // (if column is already there)
                     // Just log it
                     Log.e(TAG, "Exception adding preferred column to database. ", e);
+                }
+            }
+            if (oldVersion < (11 << 16 | 6)) {
+                try {
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN read_only BOOLEAN DEFAULT 0;");
+                    oldVersion = 11 << 16 | 6;
+                } catch (SQLException e) {
+                    Log.e(TAG, "Exception adding read_only column to database. ", e);
+                }
+            }
+            if (oldVersion < (12 << 16 | 6)) {
+                try {
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN ppp_number TEXT DEFAULT '';");
+                    oldVersion = 12 << 16 | 6;
+                } catch (SQLException e) {
+                    Log.e(TAG, "Exception adding ppp_number column to database. ", e);
+                }
+            }
+            if (oldVersion < (13 << 16 | 6)) {
+                try {
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN localized_name TEXT DEFAULT '';");
+                    oldVersion = 13 << 16 | 6;
+                } catch (SQLException e) {
+                    Log.e(TAG, "Exception adding localized_name column to database. ", e);
+                }
+            }
+            if (oldVersion < (14 << 16 | 6)) {
+                try {
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN visit_area TEXT DEFAULT '';");
+                    oldVersion = 14 << 16 | 6;
+                } catch (SQLException e) {
+                    Log.e(TAG, "Exception adding visit_area column to database. ", e);
+                }
+            }
+            if (oldVersion < (15 << 16 | 6)) {
+                try {
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN v_mccmnc TEXT DEFAULT '';");
+                    oldVersion = 15 << 16 | 6;
+                } catch (SQLException e) {
+                    Log.e(TAG, "Exception adding v_mccmnc column to database. ", e);
                 }
             }
         }
