@@ -16,17 +16,17 @@
 
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <!-- Apn PPP number -->
-    <string name="ppp_number">ppp_number</string>
+    <string name="ppp_number" translatable="false">ppp_number</string>
 
     <!-- Apn read only -->
-    <string name="read_only">read_only</string>
+    <string name="read_only" translatable="false">read_only</string>
 
     <!-- Apn localized name -->
-    <string name="localized_name">localized_name</string>
+    <string name="localized_name" translatable="false">localized_name</string>
 
     <!-- v_mccmnc -->
-    <string name="v_mccmnc">v_mccmnc</string>
+    <string name="v_mccmnc" translatable="false">v_mccmnc</string>
 
     <!-- default protocol -->
-    <string name="default_protocol">IP</string>
+    <string name="default_protocol" translatable="false">IP</string>
 </resources>
