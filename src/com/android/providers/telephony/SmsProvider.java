@@ -254,7 +254,7 @@ public class SmsProvider extends ContentProvider {
         return ret;
     }
 
-    private Object[] convertIccToSms(SmsMessage message, int id, int subscription) {
+    private Object[] convertIccToSms(SmsMessage message, int id, int phoneId) {
         // N.B.: These calls must appear in the same order as the
         // columns appear in ICC_COLUMNS.
         int statusOnIcc = message.getStatusOnIcc();
@@ -287,14 +287,14 @@ public class SmsProvider extends ContentProvider {
         row[10] = 0;      // locked
         row[11] = 0;      // error_code
         row[12] = id;
-        row[13] = subscription;
+        row[13] = phoneId;
         return row;
     }
 
     /**
      * Return a Cursor containing just one message from the ICC.
      */
-    private Cursor getSingleMessageFromIcc(String messageIndexString, int subscription) {
+    private Cursor getSingleMessageFromIcc(String messageIndexString, int phoneId) {
         ArrayList<SmsMessage> messages;
         int messageIndex = -1;
         try {
@@ -308,10 +308,10 @@ public class SmsProvider extends ContentProvider {
         // Use phone id to avoid AppOps uid mismatch in telephony
         long token = Binder.clearCallingIdentity();
         try {
-            if (subscription == INVALID_SUBSCRIPTION) {
+            if (phoneId == INVALID_SUBSCRIPTION) {
                 messages = smsManager.getAllMessagesFromIcc();
             } else {
-                messages = smsManager.getAllMessagesFromIcc(subscription);
+                messages = smsManager.getAllMessagesFromIcc(phoneId);
             }
         } finally {
             Binder.restoreCallingIdentity(token);
@@ -325,24 +325,25 @@ public class SmsProvider extends ContentProvider {
                     "Message not retrieved. ID: " + messageIndexString);
         }
         MatrixCursor cursor = new MatrixCursor(ICC_COLUMNS, 1);
-        cursor.addRow(convertIccToSms(message, 0, subscription));
+        cursor.addRow(convertIccToSms(message, 0, phoneId));
         return withIccNotificationUri(cursor);
     }
 
     /**
      * Return a Cursor listing all the messages stored on the ICC.
      */
-    private Cursor getAllMessagesFromIcc(int subscription) {
+    private Cursor getAllMessagesFromIcc(int phoneId) {
         ArrayList<SmsMessage> messages;
 
         // use phone app permissions to avoid UID mismatch in AppOpsManager.noteOp() call
         long token = Binder.clearCallingIdentity();
         try {
             SmsManager smsManager = SmsManager.getDefault();
-            if (subscription == INVALID_SUBSCRIPTION) {
+            if (phoneId == INVALID_SUBSCRIPTION) {
                 messages = smsManager.getAllMessagesFromIcc();
             } else {
-                messages = smsManager.getAllMessagesFromIcc(subscription);
+                long [] subId = SubscriptionManager.getSubId(phoneId);
+                messages = smsManager.getAllMessagesFromIcc(subId[0]);
             }
         } finally {
             Binder.restoreCallingIdentity(token);
@@ -353,7 +354,7 @@ public class SmsProvider extends ContentProvider {
         for (int i = 0; i < count; i++) {
             SmsMessage message = messages.get(i);
             if (message != null) {
-                cursor.addRow(convertIccToSms(message, i, subscription));
+                cursor.addRow(convertIccToSms(message, i, phoneId));
             }
         }
         return withIccNotificationUri(cursor);
@@ -671,19 +672,19 @@ public class SmsProvider extends ContentProvider {
      * Delete the message at index from ICC.  Return true iff
      * successful.
      */
-    private int deleteMessageFromIcc(String messageIndexString, int subscription) {
+    private int deleteMessageFromIcc(String messageIndexString, int phoneId) {
         SmsManager smsManager = SmsManager.getSmsManagerForSubscriber(
                 SubscriptionManager.getDefaultSmsSubId());
         // Use phone id to avoid AppOps uid mismatch in telephony
         long token = Binder.clearCallingIdentity();
         try {
-            if (subscription == INVALID_SUBSCRIPTION) {
+            if (phoneId == INVALID_SUBSCRIPTION) {
                 return smsManager.deleteMessageFromIcc(
                         Integer.parseInt(messageIndexString))
                        ? DELETE_SUCCESS : DELETE_FAIL;
             } else {
                 return smsManager.deleteMessageFromIcc(
-                       subscription, Integer.parseInt(messageIndexString))
+                       phoneId, Integer.parseInt(messageIndexString))
                         ? DELETE_SUCCESS : DELETE_FAIL;
             }
         } catch (NumberFormatException exception) {
