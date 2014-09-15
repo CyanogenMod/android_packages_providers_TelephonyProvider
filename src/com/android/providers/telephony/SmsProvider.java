@@ -311,7 +311,8 @@ public class SmsProvider extends ContentProvider {
             if (phoneId == INVALID_SUBSCRIPTION) {
                 messages = smsManager.getAllMessagesFromIcc();
             } else {
-                messages = smsManager.getAllMessagesFromIcc(phoneId);
+                long [] subId = SubscriptionManager.getSubId(phoneId);
+                messages = SmsManager.getSmsManagerUsingSubId(subId[0]).getAllMessagesFromIcc();
             }
         } finally {
             Binder.restoreCallingIdentity(token);
@@ -343,7 +344,7 @@ public class SmsProvider extends ContentProvider {
                 messages = smsManager.getAllMessagesFromIcc();
             } else {
                 long [] subId = SubscriptionManager.getSubId(phoneId);
-                messages = smsManager.getAllMessagesFromIcc(subId[0]);
+                messages = SmsManager.getSmsManagerUsingSubId(subId[0]).getAllMessagesFromIcc();
             }
         } finally {
             Binder.restoreCallingIdentity(token);
@@ -685,8 +686,9 @@ public class SmsProvider extends ContentProvider {
                         Integer.parseInt(messageIndexString))
                        ? DELETE_SUCCESS : DELETE_FAIL;
             } else {
-                return smsManager.deleteMessageFromIcc(
-                       phoneId, Integer.parseInt(messageIndexString))
+                long [] subId = SubscriptionManager.getSubId(phoneId);
+                return SmsManager.getSmsManagerUsingSubId(subId[0]).deleteMessageFromIcc(
+                       Integer.parseInt(messageIndexString))
                         ? DELETE_SUCCESS : DELETE_FAIL;
             }
         } catch (NumberFormatException exception) {
