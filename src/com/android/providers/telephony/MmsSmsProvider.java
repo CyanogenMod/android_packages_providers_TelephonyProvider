@@ -19,6 +19,7 @@ package com.android.providers.telephony;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import android.app.AppOpsManager;
@@ -1788,7 +1789,7 @@ public class MmsSmsProvider extends ContentProvider {
     private String getMmsQueryString(int searchMode, int matchWhole, String threadIdString) {
         String mmsQuery = "";
         if (searchMode == SEARCH_MODE_CONTENT) {
-            mmsQuery = String.format(
+            mmsQuery = String.format(Locale.US,
                     "SELECT %s FROM pdu,part,addr WHERE ((part.mid=pdu._id) AND " +
                     "(addr.msg_id=pdu._id) AND " +
                     "(addr.type=%d) AND " +
@@ -1803,7 +1804,7 @@ public class MmsSmsProvider extends ContentProvider {
                     "(address like ?)) GROUP BY pdu._id",
                     MMS_PROJECTION_FOR_NUMBER_SEARCH);
         } else if (searchMode == SEARCH_MODE_NUMBER && matchWhole == MATCH_BY_THREAD_ID) {
-            mmsQuery = String.format(
+            mmsQuery = String.format(Locale.US,
                     "SELECT %s FROM pdu,addr WHERE (" +
                     "(thread_id in (%s)) AND " +
                     "(addr.msg_id = pdu._id) AND " +
