@@ -312,7 +312,7 @@ public class SmsProvider extends ContentProvider {
                 messages = smsManager.getAllMessagesFromIcc();
             } else {
                 long [] subId = SubscriptionManager.getSubId(phoneId);
-                messages = SmsManager.getSmsManagerUsingSubId(subId[0]).getAllMessagesFromIcc();
+                messages = SmsManager.getSmsManagerForSubscriber(subId[0]).getAllMessagesFromIcc();
             }
         } finally {
             Binder.restoreCallingIdentity(token);
@@ -344,7 +344,7 @@ public class SmsProvider extends ContentProvider {
                 messages = smsManager.getAllMessagesFromIcc();
             } else {
                 long [] subId = SubscriptionManager.getSubId(phoneId);
-                messages = SmsManager.getSmsManagerUsingSubId(subId[0]).getAllMessagesFromIcc();
+                messages = SmsManager.getSmsManagerForSubscriber(subId[0]).getAllMessagesFromIcc();
             }
         } finally {
             Binder.restoreCallingIdentity(token);
@@ -687,7 +687,7 @@ public class SmsProvider extends ContentProvider {
                        ? DELETE_SUCCESS : DELETE_FAIL;
             } else {
                 long [] subId = SubscriptionManager.getSubId(phoneId);
-                return SmsManager.getSmsManagerUsingSubId(subId[0]).deleteMessageFromIcc(
+                return SmsManager.getSmsManagerForSubscriber(subId[0]).deleteMessageFromIcc(
                        Integer.parseInt(messageIndexString))
                         ? DELETE_SUCCESS : DELETE_FAIL;
             }
