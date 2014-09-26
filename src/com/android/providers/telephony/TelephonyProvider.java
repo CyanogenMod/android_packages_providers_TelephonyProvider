@@ -198,7 +198,8 @@ public class TelephonyProvider extends ContentProvider
                     + SubscriptionManager.DATA_ROAMING + " INTEGER DEFAULT " + SubscriptionManager.DATA_ROAMING_DEFAULT + ","
                     + SubscriptionManager.MCC + " INTEGER DEFAULT 0,"
                     + SubscriptionManager.MNC + " INTEGER DEFAULT 0" + ","
-                    + SubscriptionManager.SUB_STATE + " INTEGER DEFAULT " + SubscriptionManager.ACTIVE
+                    + SubscriptionManager.SUB_STATE + " INTEGER DEFAULT " + SubscriptionManager.ACTIVE + ","
+                    + SubscriptionManager.NETWORK_MODE+ " INTEGER DEFAULT " + SubscriptionManager.DEFAULT_NW_MODE
                     + ");");
             if (DBG) log("dbh.createSimInfoTable:-");
         }
