@@ -33,6 +33,8 @@ import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.android.internal.telephony.util.BlacklistUtils;
+
 import java.util.Locale;
 
 public class BlacklistProvider extends ContentProvider {
@@ -364,15 +366,18 @@ public class BlacklistProvider extends ContentProvider {
                 return null;
             }
 
-            String normalizedNumber = normalizeNumber(getContext(), number, true);
-            if (normalizedNumber == null) {
+            String strictNormalizedNumber = normalizeNumber(getContext(), number, true);
+            String nonStrictNormalizedNumber = normalizeNumber(getContext(), number, false);
+            boolean isRegex = BlacklistUtils.isBlacklistRegexEnabled(getContext()) &&
+                    (nonStrictNormalizedNumber.indexOf('%') >= 0
+                    || nonStrictNormalizedNumber.indexOf('_') >= 0);
+            if (strictNormalizedNumber == null && !isRegex) {
                 // number was invalid
                 return null;
             }
 
-            boolean isRegex = normalizedNumber.indexOf('%') >= 0
-                    || normalizedNumber.indexOf('_') >= 0;
-
+            final String normalizedNumber = isRegex ?
+                    nonStrictNormalizedNumber : strictNormalizedNumber;
             values.put(COLUMN_NORMALIZED, normalizedNumber);
             values.put(Blacklist.IS_REGEX, isRegex ? 1 : 0);
         }
@@ -411,10 +416,11 @@ public class BlacklistProvider extends ContentProvider {
             }
         }
 
-        return toE164Number(context, ret.toString(), enforceValidity);
+        return toE164Number(context, ret.toString(), number, enforceValidity);
     }
 
-    private static String toE164Number(Context context, String src, boolean enforceValidity) {
+    private static String toE164Number(Context context, String src, String orig,
+            boolean enforceValidity) {
         // Try to retrieve the current ISO Country code
         TelephonyManager tm = (TelephonyManager)
                 context.getSystemService(Context.TELEPHONY_SERVICE);
@@ -424,9 +430,18 @@ public class BlacklistProvider extends ContentProvider {
                 : new Locale("", countryCode);
 
         String e164Number = PhoneNumberUtils.formatNumberToE164(src, numberLocale.getCountry());
-        if (e164Number != null || enforceValidity) {
+        if (e164Number != null || (enforceValidity && !isValidPhoneNumber(orig))) {
             return e164Number;
         }
         return src;
+    }
+
+    private static boolean isValidPhoneNumber(String address) {
+        for (int i = 0, count = address.length(); i < count; i++) {
+            if (!PhoneNumberUtils.isISODigit(address.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 }
