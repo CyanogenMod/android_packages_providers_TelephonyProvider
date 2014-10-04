@@ -38,6 +38,7 @@ import android.provider.Telephony.TextBasedSmsColumns;
 import android.provider.Telephony.Threads;
 import android.telephony.SmsManager;
 import android.telephony.SmsMessage;
+import android.telephony.SubscriptionManager;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -292,7 +293,8 @@ public class SmsProvider extends ContentProvider {
             throw new IllegalArgumentException("Bad SMS ICC ID: " + messageIndexString);
         }
         ArrayList<SmsMessage> messages;
-        final SmsManager smsManager = SmsManager.getDefault();
+        SmsManager smsManager = SmsManager.getSmsManagerForSubscriptionId(
+                SubscriptionManager.getDefaultSmsSubId());
         // Use phone id to avoid AppOps uid mismatch in telephony
         long token = Binder.clearCallingIdentity();
         try {
@@ -317,7 +319,8 @@ public class SmsProvider extends ContentProvider {
      * Return a Cursor listing all the messages stored on the ICC.
      */
     private Cursor getAllMessagesFromIcc() {
-        SmsManager smsManager = SmsManager.getDefault();
+        SmsManager smsManager = SmsManager.getSmsManagerForSubscriptionId(
+                SubscriptionManager.getDefaultSmsSubId());
         ArrayList<SmsMessage> messages;
 
         // use phone app permissions to avoid UID mismatch in AppOpsManager.noteOp() call
@@ -653,7 +656,8 @@ public class SmsProvider extends ContentProvider {
      * successful.
      */
     private int deleteMessageFromIcc(String messageIndexString) {
-        SmsManager smsManager = SmsManager.getDefault();
+        SmsManager smsManager = SmsManager.getSmsManagerForSubscriptionId(
+                SubscriptionManager.getDefaultSmsSubId());
         // Use phone id to avoid AppOps uid mismatch in telephony
         long token = Binder.clearCallingIdentity();
         try {
