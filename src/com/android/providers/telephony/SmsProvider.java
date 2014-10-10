@@ -87,7 +87,7 @@ public class SmsProvider extends ContentProvider {
         "locked",                       // Always 0 (false).
         "error_code",                   // Always 0
         "_id",
-        "sub_id"
+        "phone_id"
     };
 
     @Override
