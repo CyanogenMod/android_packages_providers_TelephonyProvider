@@ -89,6 +89,8 @@ public class TelephonyProvider extends ContentProvider
     private static final String READ_ONLY = "read_only";
     private static final String LOCALIZED_NAME = "localized_name";
 
+    private static final String VISIT_AREA = "visit_area";
+
     private static final UriMatcher s_urlMatcher = new UriMatcher(UriMatcher.NO_MATCH);
 
     private static final ContentValues s_currentNullMap;
@@ -243,6 +245,7 @@ public class TelephonyProvider extends ContentProvider
                     "read_only BOOLEAN DEFAULT 0," +
                     "ppp_number TEXT," +
                     "localized_name TEXT," +
+                    "visit_area TEXT," +
                     "mtu INTEGER);");
              /* FIXME Currenlty sub_id is column is not used for query purpose.
              This would be modified to more appropriate default value later. */
@@ -508,6 +511,11 @@ public class TelephonyProvider extends ContentProvider
             if (readOnly != null) {
                 map.put(mContext.getString(R.string.read_only), Boolean.
                         parseBoolean(readOnly));
+            }
+
+            String visitArea = parser.getAttributeValue(null, "visit_area");
+            if (visitArea != null) {
+                map.put(VISIT_AREA, visitArea);
             }
 
             return map;
