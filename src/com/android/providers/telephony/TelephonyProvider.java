@@ -102,6 +102,8 @@ public class TelephonyProvider extends ContentProvider
     private static final String READ_ONLY = "read_only";
     private static final String LOCALIZED_NAME = "localized_name";
 
+    private static final String VISIT_AREA = "visit_area";
+
     private static final UriMatcher s_urlMatcher = new UriMatcher(UriMatcher.NO_MATCH);
 
     private static final ContentValues s_currentNullMap;
@@ -275,6 +277,7 @@ public class TelephonyProvider extends ContentProvider
                     "read_only BOOLEAN DEFAULT 0," +
                     "ppp_number TEXT DEFAULT ''," +
                     "localized_name TEXT DEFAULT ''," +
+                    "visit_area TEXT DEFAULT ''," +
                     // Uniqueness collisions are used to trigger merge code so if a field is listed
                     // here it means we will accept both (user edited + new apn_conf definition)
                     // Columns not included in UNIQUE constraint: name, current, edited,
