@@ -1096,6 +1096,32 @@ public class MmsSmsProvider extends ContentProvider {
                 EMPTY_STRING_ARRAY);
     }
 
+    private static String appendSmsSelection(String selection) {
+        if (!isMmsSelection(selection)) {
+            return appendSelection(selection);
+        }
+        return "";
+    }
+
+    private static String appendMmsSelection(String selection) {
+        if (!isSmsSelection(selection)) {
+            return appendSelection(selection);
+        }
+        return "";
+    }
+
+    private static String appendSelection(String selection) {
+        return TextUtils.isEmpty(selection) ? "" : " AND " + selection;
+    }
+
+    private static boolean isSmsSelection(String selection) {
+        return !TextUtils.isEmpty(selection) && selection.contains("sms.");
+    }
+
+    private static boolean isMmsSelection(String selection) {
+        return !TextUtils.isEmpty(selection) && selection.contains("pdu.");
+    }
+
     private static String buildMailboxMsgQuery(String mailboxId,
             String[] projection, String selection, String[] selectionArgs,
             String sortOrder, boolean read, String pduTable) {
@@ -1131,25 +1157,16 @@ public class MmsSmsProvider extends ContentProvider {
             compare = " >= ";
         }
 
-        String smsSelection = null;
-        String mmsSelection = null;
-
-        if (!TextUtils.isEmpty(selection)) {
-            mmsSelection = Mms.MESSAGE_BOX + compare + mailboxId
-                    + " AND thread_id = threads._id AND m_type != "
-                    + PduHeaders.MESSAGE_TYPE_DELIVERY_IND + selection;
-            smsSelection = "(sms." + Sms.TYPE + compare + mailboxId
-                    + " AND thread_id = threads._id" + " AND " + selection
-                    + ")" + " OR (sms." + Sms.TYPE + compare + mailboxId
-                    + " AND thread_id ISNULL" + " AND " + selection + ")";
-        } else {
-            mmsSelection = Mms.MESSAGE_BOX + compare + mailboxId
-                    + " AND thread_id = threads._id AND m_type != "
-                    + PduHeaders.MESSAGE_TYPE_DELIVERY_IND;
-            smsSelection = "(sms." + Sms.TYPE + compare + mailboxId
-                    + " AND thread_id = threads._id" + ") OR (sms." + Sms.TYPE
-                    + compare + mailboxId + " AND thread_id ISNULL" + ")";
-        }
+        String appendSmsSelection = appendSmsSelection(selection);
+        String appendMmsSelection = appendMmsSelection(selection);
+        String mmsSelection = Mms.MESSAGE_BOX + compare + mailboxId
+                + " AND thread_id = threads._id AND m_type != "
+                + PduHeaders.MESSAGE_TYPE_DELIVERY_IND + selection;
+        String smsSelection = "(sms." + Sms.TYPE + compare + mailboxId
+                + " AND thread_id = threads._id" + appendSmsSelection
+                + ")" + " OR (sms." + Sms.TYPE + compare + mailboxId
+                + " AND thread_id ISNULL " + appendSmsSelection
+                + ")";
 
         String mmsSubQuery = mmsQueryBuilder.buildUnionSubQuery(
                 MmsSms.TYPE_DISCRIMINATOR_COLUMN, innerMmsProjection,
@@ -1171,8 +1188,13 @@ public class MmsSmsProvider extends ContentProvider {
 
         SQLiteQueryBuilder unionQueryBuilder = new SQLiteQueryBuilder();
         String unionQuery = null;
-        unionQuery = unionQueryBuilder.buildUnionQuery(new String[] {
-                mmsSubQuery, smsSubQuery }, null, null);
+        if (isMmsSelection(selection)) {
+            unionQuery = mmsSubQuery;
+        } else {
+            unionQuery = unionQueryBuilder.buildUnionQuery(new String[] {
+                    mmsSubQuery, smsSubQuery
+            }, null, null);
+        }
         if (DEBUG) {
             Log.w(LOG_TAG, "buildMailboxMsgQuery : unionQuery = " + unionQuery);
         }
