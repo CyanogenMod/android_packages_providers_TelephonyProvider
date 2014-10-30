@@ -580,7 +580,7 @@ public class TelephonyProvider extends ContentProvider
                 values.put(Telephony.Carriers.MVNO_MATCH_DATA, "");
             }
 
-            long subId = SubscriptionManager.getDefaultSubId();
+            long subId = SubscriptionManager.getDefaultDataSubId();
             if (!values.containsKey(Telephony.Carriers.SUB_ID)) {
                 values.put(Telephony.Carriers.SUB_ID, subId);
             }
@@ -637,7 +637,7 @@ public class TelephonyProvider extends ContentProvider
             String[] selectionArgs, String sort) {
         TelephonyManager mTelephonyManager =
                 (TelephonyManager)getContext().getSystemService(Context.TELEPHONY_SERVICE);
-        long subId = SubscriptionManager.getDefaultSubId();
+        long subId = SubscriptionManager.getDefaultDataSubId();
         String subIdString;
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
         qb.setStrict(true); // a little protection from injection attacks
@@ -776,7 +776,7 @@ public class TelephonyProvider extends ContentProvider
     public Uri insert(Uri url, ContentValues initialValues)
     {
         Uri result = null;
-        long subId = SubscriptionManager.getDefaultSubId();
+        long subId = SubscriptionManager.getDefaultDataSubId();
 
         checkPermission();
 
@@ -897,7 +897,7 @@ public class TelephonyProvider extends ContentProvider
     public int delete(Uri url, String where, String[] whereArgs)
     {
         int count = 0;
-        long subId = SubscriptionManager.getDefaultSubId();
+        long subId = SubscriptionManager.getDefaultDataSubId();
 
         checkPermission();
 
@@ -1011,7 +1011,7 @@ public class TelephonyProvider extends ContentProvider
     {
         int count = 0;
         int uriType = URL_UNKNOWN;
-        long subId = SubscriptionManager.getDefaultSubId();
+        long subId = SubscriptionManager.getDefaultDataSubId();
 
         checkPermission();
 
