@@ -215,7 +215,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private static boolean sFakeLowStorageTest = false;     // for testing only
 
     static final String DATABASE_NAME = "mmssms.db";
-    static final int DATABASE_VERSION = 60;
+    static final int DATABASE_VERSION = 61;
     private final Context mContext;
     private LowStorageMonitor mLowStorageMonitor;
 
@@ -1329,6 +1329,22 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             } finally {
                 db.endTransaction();
             }
+            // fall through
+        case 60:
+            if (currentVersion <= 60) {
+                return;
+            }
+
+            db.beginTransaction();
+            try {
+                upgradeDatabaseToVersion61(db);
+                db.setTransactionSuccessful();
+            } catch (Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+                break;
+            } finally {
+                db.endTransaction();
+            }
             return;
         }
 
@@ -1551,6 +1567,17 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private void upgradeDatabaseToVersion60(SQLiteDatabase db) {
         db.execSQL("ALTER TABLE " + MmsSmsProvider.TABLE_THREADS +" ADD COLUMN "
                 + Threads.ARCHIVED + " INTEGER DEFAULT 0");
+    }
+
+    private void upgradeDatabaseToVersion61(SQLiteDatabase db) {
+        try {
+            db.execSQL("ALTER TABLE " + SmsProvider.TABLE_SMS + " ADD COLUMN "
+                    + "priority INTEGER DEFAULT -1");
+        } catch (Exception e) {
+            // Some db with version < 61 might already have priority column.
+            // So gracefully catch exception.
+            Log.e(TAG, "upgradeDatabaseToVersion61: ex. ", e);
+        }
     }
 
     @Override
