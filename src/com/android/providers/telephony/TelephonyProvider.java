@@ -123,7 +123,7 @@ public class TelephonyProvider extends ContentProvider
 
     private static class DatabaseHelper extends SQLiteOpenHelper {
         // Context to access resources with
-        private Context mContext;
+        static Context mContext;
 
         /**
          * DatabaseHelper helper class for loading apns into a database.
@@ -325,9 +325,11 @@ public class TelephonyProvider extends ContentProvider
             if (oldVersion < (6 << 16 | 6)) {
                 // Add protcol fields to the APN. The XML file does not change.
                 db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN protocol TEXT DEFAULT IP;");
+                        " ADD COLUMN protocol TEXT DEFAULT " +
+                        mContext.getString(R.string.default_protocol) + ";");
                 db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN roaming_protocol TEXT DEFAULT IP;");
+                        " ADD COLUMN roaming_protocol TEXT DEFAULT " +
+                        mContext.getString(R.string.default_protocol) + ";");
                 oldVersion = 6 << 16 | 6;
             }
             if (oldVersion < (7 << 16 | 6)) {
@@ -586,10 +588,11 @@ public class TelephonyProvider extends ContentProvider
                 values.put(Telephony.Carriers.AUTH_TYPE, -1);
             }
             if (!values.containsKey(Telephony.Carriers.PROTOCOL)) {
-                values.put(Telephony.Carriers.PROTOCOL, "IP");
+                values.put(Telephony.Carriers.PROTOCOL, mContext.getString(R.string.default_protocol));
             }
             if (!values.containsKey(Telephony.Carriers.ROAMING_PROTOCOL)) {
-                values.put(Telephony.Carriers.ROAMING_PROTOCOL, "IP");
+                values.put(Telephony.Carriers.ROAMING_PROTOCOL,
+                        mContext.getString(R.string.default_protocol));
             }
             if (!values.containsKey(Telephony.Carriers.CARRIER_ENABLED)) {
                 values.put(Telephony.Carriers.CARRIER_ENABLED, true);
