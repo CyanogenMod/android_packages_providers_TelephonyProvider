@@ -823,6 +823,7 @@ public class MmsProvider extends ContentProvider {
         }
 
         if (match != MMS_PART_ID) {
+            Log.e(TAG, "Not a valid query for part, ignoring");
             return null;
         }
 
@@ -847,6 +848,7 @@ public class MmsProvider extends ContentProvider {
         c.close();
 
         if (path == null) {
+            Log.e(TAG, "Data column for uri is empty");
             return null;
         }
         try {
@@ -859,10 +861,11 @@ public class MmsProvider extends ContentProvider {
             // the paths.
             if (!filePath.getCanonicalPath()
                     .startsWith(appDataDirPath.getCanonicalPath())) {
+                Log.e(TAG, path + " does not link to valid app_parts directory (" + appDataDirPath + ")");
                 return null;
             }
         } catch (IOException e) {
-            return null;
+            throw new FileNotFoundException("Problem accessing app_parts directory");
         }
 
         return openFileHelper(uri, mode);
