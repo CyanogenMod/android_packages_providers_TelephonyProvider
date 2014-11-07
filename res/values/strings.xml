@@ -36,4 +36,7 @@
 
     <!-- Apn localized name -->
     <string name="localized_name">localized_name</string>
+
+    <!-- default protocol -->
+    <string name="default_protocol">IP</string>
 </resources>
