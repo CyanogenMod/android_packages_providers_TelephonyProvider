@@ -46,6 +46,7 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.util.Xml;
 
+import com.android.internal.telephony.RILConstants;
 import com.android.internal.util.XmlUtils;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -66,7 +67,7 @@ public class TelephonyProvider extends ContentProvider
     private static final boolean DBG = true;
     private static final boolean VDBG = false; // STOPSHIP if true
 
-    private static final int DATABASE_VERSION = 17 << 16;
+    private static final int DATABASE_VERSION = 21 << 16;
     private static final int URL_UNKNOWN = 0;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
@@ -222,6 +223,7 @@ public class TelephonyProvider extends ContentProvider
                     + SubscriptionManager.MNC + " INTEGER DEFAULT 0,"
                     + SubscriptionManager.SUB_STATE + " INTEGER DEFAULT " + SubscriptionManager.ACTIVE + ","
                     + SubscriptionManager.NETWORK_MODE+ " INTEGER DEFAULT " + SubscriptionManager.DEFAULT_NW_MODE + ","
+                    + SubscriptionManager.USER_NETWORK_MODE + " INTEGER DEFAULT " + RILConstants.PREFERRED_NETWORK_MODE + ","
                     + SubscriptionManager.CB_EXTREME_THREAT_ALERT + " INTEGER DEFAULT 1,"
                     + SubscriptionManager.CB_SEVERE_THREAT_ALERT + " INTEGER DEFAULT 1,"
                     + SubscriptionManager.CB_AMBER_ALERT + " INTEGER DEFAULT 1,"
@@ -474,16 +476,7 @@ public class TelephonyProvider extends ContentProvider
                 oldVersion = 9 << 16 | 6;
             }
             if (oldVersion < (10 << 16 | 6)) {
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN profile_id INTEGER DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN modem_cognitive BOOLEAN DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN max_conns INTEGER DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN wait_time INTEGER DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN max_conns_time INTEGER DEFAULT 0;");
+                upgradeForProfileIdIfNecessary(db);
                 oldVersion = 10 << 16 | 6;
             }
             if (oldVersion < (11 << 16 | 6)) {
@@ -511,6 +504,12 @@ public class TelephonyProvider extends ContentProvider
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN " +
                             SubscriptionManager.CARRIER_NAME + " TEXT DEFAULT '';");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
+                            " ADD COLUMN " + "sub_state"
+                            + " INTEGER DEFAULT " + 1 + ";");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
+                            " ADD COLUMN " + "network_mode"
+                            + " INTEGER DEFAULT " + -1 + ";");
                 } catch (SQLiteException e) {
                     if (DBG) {
                         log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
@@ -519,12 +518,94 @@ public class TelephonyProvider extends ContentProvider
                 }
                 oldVersion = 13 << 16 | 6;
             }
-            if (oldVersion < (14 << 16 | 6)) {
-                // Do nothing. This is to avoid recreating table twice. Table is anyway recreated
-                // for next version and that takes care of updates for this version as well.
-                // This version added a new column user_edited to carriers db.
+            //CM Switched from Version13 to Version17/18
+            if (oldVersion < (17 << 16 | 6)) {
+                try {
+                        upgradeForProfileIdIfNecessary(db);
+                    } catch (SQLiteException e) {
+                        if (DBG) {
+                            log("onUpgrade " + CARRIERS_TABLE + ": profile_id already present.");
+                        }
+                    }
+                    
+                    try {
+                        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                                " ADD COLUMN mtu INTEGER DEFAULT 0;");
+                    } catch (SQLiteException e) {
+                        if (DBG) {
+                            log("onUpgrade " + CARRIERS_TABLE + ": mtu already present.");
+                        }
+                    }
+                    
+                    try {
+                    // Add ppp_number field if it's missing
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN ppp_number TEXT DEFAULT '';");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade " + CARRIERS_TABLE + ": ppp_number already present.");
+                    }
+                }
+
+                try {
+                    // Add localized_name field if it's missing
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN localized_name TEXT DEFAULT '';");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade " + CARRIERS_TABLE + ": localized_name already present.");
+                    }
+                }
+
+                try {
+                    // Add visit_area field if it's missing
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN visit_area TEXT DEFAULT '';");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade " + CARRIERS_TABLE + ": visit_area already present.");
+                    }
+                }
+
+                try {
+                    // Try to update the siminfo table. It might not be there.
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
+                            " ADD COLUMN " + SubscriptionManager.CARRIER_NAME + " TEXT DEFAULT '';");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
+                                " The table will get created in onOpen.");
+                    }
+                }
+
+                try {
+                    // read_only was present in CM11, but not in CM12. Add it if it's missing.
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN read_only BOOLEAN DEFAULT 0;");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade " + CARRIERS_TABLE + ": read_only already present.");
+                    }
+                }
+                oldVersion = 17 << 16 | 6;
             }
-            if (oldVersion < (15 << 16 | 6)) {
+            if (oldVersion < (18 << 16 | 6)) {
+                try {
+                    // Try to update the siminfo table. It might not be there.
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE
+                            + " ADD COLUMN " + SubscriptionManager.USER_NETWORK_MODE
+                            + " INTEGER DEFAULT " + RILConstants.PREFERRED_NETWORK_MODE + ";");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
+                                " The table will get created in onOpen.");
+                    }
+                }
+                oldVersion = 18 << 16 | 6;
+            }
+            //CM Switched from Version13 to Version17/18, comments below reflect AOSP. In case
+            //of CM we will be upgrading from version 18, but the logic applies.
+            if (oldVersion < (21 << 16 | 6)) {
                 // Most devices should be upgrading from version 13. On upgrade new db will be
                 // populated from the xml included in OTA but user and carrier edited/added entries
                 // need to be preserved. This new version also adds new columns EDITED and
@@ -581,9 +662,6 @@ public class TelephonyProvider extends ContentProvider
                     c.close();
                 }
 
-                oldVersion = 15 << 16 | 6;
-            }
-            if (oldVersion < (16 << 16 | 6)) {
                 try {
                     // Try to update the siminfo table. It might not be there.
                     // These columns may already be present in which case execSQL will throw an
@@ -618,8 +696,9 @@ public class TelephonyProvider extends ContentProvider
                                 " The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 16 << 16 | 6;
+                oldVersion = 21 << 16 | 6;
             }
+
             if (DBG) {
                 log("dbh.onUpgrade:- db=" + db + " oldV=" + oldVersion + " newV=" + newVersion);
             }
@@ -642,10 +721,13 @@ public class TelephonyProvider extends ContentProvider
                 // upgrade are mentioned in onUpgrade(). This file missing means user/carrier added
                 // APNs cannot be preserved. Throw an exception so that OEMs know they need to
                 // include old apns file for comparison.
-                loge("preserveUserAndCarrierApns: FileNotFoundException");
-                throw new RuntimeException("preserveUserAndCarrierApns: " + OLD_APNS_PATH +
-                        " not found. It is needed to upgrade from older versions of APN " +
-                        "db while preserving user/carrier added/edited entries.");
+                loge("preserveUserAndCarrierApns: FileNotFoundException " + OLD_APNS_PATH +
+                        " not found. It is needed to upgrade from older versions of APN" +
+                        " db while preserving user/carrier added/edited entries.");
+                // In CM we have many versions of APN's. If OLD file is not found log error only
+                //throw new RuntimeException("preserveUserAndCarrierApns: " + OLD_APNS_PATH +
+                //        " not found. It is needed to upgrade from older versions of APN " +
+                //        "db while preserving user/carrier added/edited entries.");
             } catch (Exception e) {
                 loge("preserveUserAndCarrierApns: Exception while parsing '" +
                         confFile.getAbsolutePath() + "'" + e);
@@ -820,6 +902,9 @@ public class TelephonyProvider extends ContentProvider
                     getStringValueFromCursor(cv, c, Telephony.Carriers.ROAMING_PROTOCOL);
                     getStringValueFromCursor(cv, c, Telephony.Carriers.MVNO_TYPE);
                     getStringValueFromCursor(cv, c, Telephony.Carriers.MVNO_MATCH_DATA);
+                    getStringValueFromCursor(cv, c, Telephony.Carriers.PPP_NUMBER);
+                    getStringValueFromCursor(cv, c, Telephony.Carriers.LOCALIZED_NAME);
+                    getStringValueFromCursor(cv, c, Telephony.Carriers.VISIT_AREA);
 
                     // bool/int vals
                     getIntValueFromCursor(cv, c, Telephony.Carriers.AUTH_TYPE);
@@ -833,6 +918,7 @@ public class TelephonyProvider extends ContentProvider
                     getIntValueFromCursor(cv, c, Telephony.Carriers.WAIT_TIME);
                     getIntValueFromCursor(cv, c, Telephony.Carriers.MAX_CONNS_TIME);
                     getIntValueFromCursor(cv, c, Telephony.Carriers.MTU);
+                    getIntValueFromCursor(cv, c, Telephony.Carriers.READ_ONLY);
 
                     // Change bearer to a bitmask
                     String bearerStr = c.getString(c.getColumnIndex(Telephony.Carriers.BEARER));
@@ -2035,6 +2121,19 @@ public class TelephonyProvider extends ContentProvider
         }
 
         return count;
+    }
+
+    private static void upgradeForProfileIdIfNecessary(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN profile_id INTEGER DEFAULT 0;");
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN modem_cognitive BOOLEAN DEFAULT 0;");
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN max_conns INTEGER DEFAULT 0;");
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN wait_time INTEGER DEFAULT 0;");
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN max_conns_time INTEGER DEFAULT 0;");
     }
 
     private void checkPermission() {
