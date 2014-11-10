@@ -394,6 +394,10 @@ public class TelephonyProvider extends ContentProvider
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
                             " ADD COLUMN " + SubscriptionManager.CARRIER_NAME + " TEXT DEFAULT '';");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
+                            " ADD COLUMN " + SubscriptionManager.SUB_STATE + " INTEGER DEFAULT " + SubscriptionManager.ACTIVE + ";");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
+                            " ADD COLUMN " + SubscriptionManager.NETWORK_MODE + " INTEGER DEFAULT " + SubscriptionManager.DEFAULT_NW_MODE + ";");
                 } catch (SQLiteException e) {
                     if (DBG) {
                         log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
