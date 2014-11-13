@@ -32,6 +32,7 @@ import android.telephony.PhoneNumberUtils;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
+import android.util.Pair;
 
 import java.util.Locale;
 
@@ -111,7 +112,7 @@ public class BlacklistProvider extends ContentProvider {
 
                         while (rows.moveToNext()) {
                             String originalNumber = rows.getString(1);
-                            String normalized = normalizeNumber(mContext, originalNumber, false);
+                            String normalized = normalizeNumber(mContext, originalNumber).first;
                             rowId[0] = rows.getString(0);
                             cv.clear();
                             cv.put(COLUMN_NORMALIZED, normalized);
@@ -159,7 +160,7 @@ public class BlacklistProvider extends ContentProvider {
                 qb.appendWhere(Blacklist._ID + " = " + uri.getLastPathSegment());
                 break;
             case BL_NUMBER: {
-                String number = normalizeNumber(getContext(), uri.getLastPathSegment(), false);
+                String number = normalizeNumber(getContext(), uri.getLastPathSegment()).first;
                 boolean regex = uri.getBooleanQueryParameter(Blacklist.REGEX_KEY, false);
 
                 if (regex) {
@@ -266,7 +267,7 @@ public class BlacklistProvider extends ContentProvider {
                 }
                 where = COLUMN_NORMALIZED + " = ?";
                 whereArgs = new String[] {
-                    normalizeNumber(getContext(), uri.getLastPathSegment(), false)
+                    normalizeNumber(getContext(), uri.getLastPathSegment()).first
                 };
                 break;
             default:
@@ -312,7 +313,7 @@ public class BlacklistProvider extends ContentProvider {
                 db.beginTransaction();
                 try {
                     count = db.update(BLACKLIST_TABLE, values, COLUMN_NORMALIZED + " = ?",
-                            new String[] { normalizeNumber(getContext(), uriNumber, false) });
+                            new String[] { normalizeNumber(getContext(), uriNumber).first });
                     if (count == 0) {
                         // convenience: fall back to insert if number wasn't present
                         if (db.insert(BLACKLIST_TABLE, null, values) > 0) {
@@ -364,14 +365,16 @@ public class BlacklistProvider extends ContentProvider {
                 return null;
             }
 
-            String normalizedNumber = normalizeNumber(getContext(), number, true);
-            if (normalizedNumber == null) {
+            final Pair<String, Boolean> normalizeResult = normalizeNumber(getContext(), number);
+            final String normalizedNumber = normalizeResult.first;
+            boolean isRegex = normalizedNumber.indexOf('%') >= 0 ||
+                    normalizedNumber.indexOf('_') >= 0;
+            // For non-regex numbers, apply additional validity checking if
+            // they didn't pass e164 normalization
+            if (!isRegex && !normalizeResult.second && !isValidPhoneNumber(number)) {
                 // number was invalid
                 return null;
             }
-
-            boolean isRegex = normalizedNumber.indexOf('%') >= 0
-                    || normalizedNumber.indexOf('_') >= 0;
 
             values.put(COLUMN_NORMALIZED, normalizedNumber);
             values.put(Blacklist.IS_REGEX, isRegex ? 1 : 0);
@@ -385,9 +388,13 @@ public class BlacklistProvider extends ContentProvider {
         mBackupManager.dataChanged();
     }
 
-    // mostly a copy of PhoneNumberUtils.normalizeNumber,
-    // with the exception of support for regex characters
-    private static String normalizeNumber(Context context, String number, boolean enforceValidity) {
+    /**
+     * Normalizes the passed in number and tries to format it according to E164.
+     * Returns a pair of
+     * - normalized number
+     * - boolean indicating whether the number is a E164 number or not
+     */
+    private static Pair<String, Boolean> normalizeNumber(Context context, String number) {
         int len = number.length();
         StringBuilder ret = new StringBuilder(len);
 
@@ -399,7 +406,7 @@ public class BlacklistProvider extends ContentProvider {
                 ret.append(digit);
             } else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
                 String actualNumber = PhoneNumberUtils.convertKeypadLettersToDigits(number);
-                return normalizeNumber(context, actualNumber, enforceValidity);
+                return normalizeNumber(context, actualNumber);
             } else if (i == 0 && c == '+') {
                 ret.append(c);
             } else if (c == '*') {
@@ -411,10 +418,12 @@ public class BlacklistProvider extends ContentProvider {
             }
         }
 
-        return toE164Number(context, ret.toString(), enforceValidity);
+        String normalizedNumber = ret.toString();
+        String e164Number = toE164Number(context, normalizedNumber);
+        return Pair.create(e164Number != null ? e164Number : normalizedNumber, e164Number != null);
     }
 
-    private static String toE164Number(Context context, String src, boolean enforceValidity) {
+    private static String toE164Number(Context context, String src) {
         // Try to retrieve the current ISO Country code
         TelephonyManager tm = (TelephonyManager)
                 context.getSystemService(Context.TELEPHONY_SERVICE);
@@ -423,10 +432,15 @@ public class BlacklistProvider extends ContentProvider {
                 ? context.getResources().getConfiguration().locale
                 : new Locale("", countryCode);
 
-        String e164Number = PhoneNumberUtils.formatNumberToE164(src, numberLocale.getCountry());
-        if (e164Number != null || enforceValidity) {
-            return e164Number;
+        return PhoneNumberUtils.formatNumberToE164(src, numberLocale.getCountry());
+    }
+
+    private static boolean isValidPhoneNumber(String address) {
+        for (int i = 0, count = address.length(); i < count; i++) {
+            if (!PhoneNumberUtils.isISODigit(address.charAt(i))) {
+                return false;
+            }
         }
-        return src;
+        return true;
     }
 }
