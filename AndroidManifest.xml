@@ -26,7 +26,7 @@
 
     <application android:process="com.android.phone"
                  android:allowClearUserData="false"
-                 android:allowBackup="false"
+                 android:backupAgent=".TelephonyBackupAgent"
                  android:label="@string/app_label"
                  android:icon="@mipmap/ic_launcher_phone"
                  android:usesCleartextTraffic="true">
@@ -72,6 +72,14 @@
                   android:exported="true"
                   android:singleUser="true"
                   android:readPermission="android.permission.READ_SMS" />
+
+        <provider android:name="BlacklistProvider"
+                  android:authorities="blacklist"
+                  android:exported="true"
+                  android:singleUser="true"
+                  android:multiprocess="true"
+                  android:readPermission="android.permission.READ_PHONE_BLACKLIST"
+                  android:writePermission="android.permission.CHANGE_PHONE_BLACKLIST" />
 
         <provider android:name="HbpcdLookupProvider"
                   android:authorities="hbpcd_lookup"
