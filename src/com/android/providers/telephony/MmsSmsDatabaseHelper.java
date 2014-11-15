@@ -215,7 +215,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private static boolean sFakeLowStorageTest = false;     // for testing only
 
     static final String DATABASE_NAME = "mmssms.db";
-    static final int DATABASE_VERSION = 61;
+    static final int DATABASE_VERSION = 62;
     private final Context mContext;
     private LowStorageMonitor mLowStorageMonitor;
 
@@ -1345,6 +1345,21 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             } finally {
                 db.endTransaction();
             }
+        case 61:
+            if (currentVersion <= 61) {
+                return;
+            }
+
+            db.beginTransaction();
+            try {
+                upgradeDatabaseToVersion62(db);
+                db.setTransactionSuccessful();
+            } catch (Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+                break;
+            } finally {
+                db.endTransaction();
+            }
             return;
         }
 
@@ -1577,6 +1592,24 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             // Some db with version < 61 might already have priority column.
             // So gracefully catch exception.
             Log.e(TAG, "upgradeDatabaseToVersion61: ex. ", e);
+        }
+    }
+
+    private void upgradeDatabaseToVersion62(SQLiteDatabase db) {
+        if (isCM11DB(db)) {
+           // CM11 was 60, which means we skipped a few updates...
+           try {
+               upgradeDatabaseToVersion58(db);
+           } catch (Exception e) { }
+           try {
+               upgradeDatabaseToVersion59(db);
+           } catch (Exception e) { }
+           try {
+               upgradeDatabaseToVersion60(db);
+           } catch (Exception e) { }
+           try {
+               upgradeDatabaseToVersion61(db);
+           } catch (Exception e) { }
         }
     }
 
@@ -1893,5 +1926,18 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "  (SELECT DISTINCT pdu.thread_id FROM part " +
                    "   JOIN pdu ON pdu._id=part.mid " +
                    "   WHERE part.ct != 'text/plain' AND part.ct != 'application/smil')");
+    }
+
+    // Determine whether this database has CM11 columns...
+    private boolean isCM11DB(SQLiteDatabase db) {
+        boolean result = false;
+        try {
+            String query = "SELECT sub_id, pri FROM sms";
+            Cursor c = db.rawQuery(query, null);
+            if (c != null) {
+                result = true;
+            }
+        } catch (Exception e) {}
+        return result;
     }
 }
