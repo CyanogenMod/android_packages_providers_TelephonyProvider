@@ -268,15 +268,16 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                         }
                     }
                     // Now build a selection string of all the unique recipient ids
-                    StringBuilder sb = new StringBuilder();
+                    StringBuilder sb = new StringBuilder("_id not in (");
                     Iterator<Integer> iter = recipientIds.iterator();
                     while (iter.hasNext()) {
-                        sb.append("_id != " + iter.next());
+                        sb.append(iter.next());
                         if (iter.hasNext()) {
-                            sb.append(" AND ");
+                            sb.append(",");
                         }
                     }
-                    if (sb.length() > 0) {
+                    sb.append(")");
+                    if (recipientIds.size() > 0) {
                         int rows = db.delete("canonical_addresses", sb.toString(), null);
                     }
                 }
