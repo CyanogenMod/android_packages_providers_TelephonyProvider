@@ -61,7 +61,7 @@ public class TelephonyProvider extends ContentProvider
     private static final boolean DBG = true;
     private static final boolean VDBG = false;
 
-    private static final int DATABASE_VERSION = 13 << 16;
+    private static final int DATABASE_VERSION = 16 << 16;
     private static final int URL_UNKNOWN = 0;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
@@ -339,60 +339,113 @@ public class TelephonyProvider extends ContentProvider
                 oldVersion = 8 << 16 | 6;
             }
             if (oldVersion < (9 << 16 | 6)) {
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN sub_id LONG DEFAULT -1;");
+                upgradeForSubIdIfNecessary(db);
                 oldVersion = 9 << 16 | 6;
             }
             if (oldVersion < (10 << 16 | 6)) {
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN profile_id INTEGER DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN modem_cognitive BOOLEAN DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN max_conns INTEGER DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN wait_time INTEGER DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN max_conns_time INTEGER DEFAULT 0;");
+                upgradeForProfileIdIfNecessary(db);
                 oldVersion = 10 << 16 | 6;
             }
             if (oldVersion < (11 << 16 | 6)) {
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN mtu INTEGER DEFAULT 0;");
+                upgradeForMtuIfNecessary(db);
                 oldVersion = 11 << 16 | 6;
             }
             if (oldVersion < (12 << 16 | 6)) {
-                try {
-                    // Try to update the siminfo table. It might not be there.
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
-                            " ADD COLUMN " + SubscriptionManager.MCC + " INTEGER DEFAULT 0;");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
-                            " ADD COLUMN " + SubscriptionManager.MNC + " INTEGER DEFAULT 0;");
-                } catch (SQLiteException e) {
-                    if (DBG) {
-                        log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
-                                " The table will get created in onOpen.");
-                    }
-                }
+                upgradeForSimInfoIfNecssary(db);
                 oldVersion = 12 << 16 | 6;
             }
             if (oldVersion < (13 << 16 | 6)) {
+                upgradeForSubscriptionInfoIfNecessary(db);
+                oldVersion = 13 << 16 | 6;
+            }
+
+            if (oldVersion < (14 << 16 | 6) || oldVersion < (15 << 16 | 6) ||
+                    oldVersion < (16 << 16 | 6)) {
+                // Handle migration from current AOSP (by artificially bumping the version
+                // and handle migration from cm-11.0, by checking for an existing column
+                // and then forcing the introduction of new columns
+                Cursor c = null;
+
                 try {
-                    // Try to update the siminfo table. It might not be there.
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
-                            " ADD COLUMN " + SubscriptionManager.SUB_STATE + " INTEGER DEFAULT " + SubscriptionManager.ACTIVE + ";");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
-                            " ADD COLUMN " + SubscriptionManager.NETWORK_MODE + " INTEGER DEFAULT " + SubscriptionManager.DEFAULT_NW_MODE + ";");
-                } catch (SQLiteException e) {
+                    c = db.rawQuery("SELECT preferred from " + CARRIERS_TABLE, null);
+                    // if this column exists, then we need to add all the columns previously
+                    // added by AOSP since version (9 << 16 | 6)
+                    if (c != null) {
+                        if (c.moveToNext()) {
+                            upgradeForSubIdIfNecessary(db);
+                            upgradeForProfileIdIfNecessary(db);
+                            upgradeForMtuIfNecessary(db);
+                            upgradeForSimInfoIfNecssary(db);
+                            upgradeForSubscriptionInfoIfNecessary(db);
+                        }
+                    }
+                } catch (SQLException e) {
                     if (DBG) {
-                        log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
+                        log("onUpgrade skipping " + CARRIERS_TABLE + " migrade. " +
                                 " The table will get created in onOpen.");
                     }
                 }
-                oldVersion = 13 << 16 | 6;
+
+                oldVersion = (16 << 16 | 6);
             }
+
             if (DBG) {
                 log("dbh.onUpgrade:- db=" + db + " oldV=" + oldVersion + " newV=" + newVersion);
+            }
+        }
+
+        private void upgradeForSubIdIfNecessary(SQLiteDatabase db) {
+            db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                    " ADD COLUMN sub_id LONG DEFAULT -1;");
+        }
+
+        private void upgradeForProfileIdIfNecessary(SQLiteDatabase db) {
+            db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                    " ADD COLUMN profile_id INTEGER DEFAULT 0;");
+            db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                    " ADD COLUMN modem_cognitive BOOLEAN DEFAULT 0;");
+            db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                    " ADD COLUMN max_conns INTEGER DEFAULT 0;");
+            db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                    " ADD COLUMN wait_time INTEGER DEFAULT 0;");
+            db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                    " ADD COLUMN max_conns_time INTEGER DEFAULT 0;");
+        }
+
+        private void upgradeForMtuIfNecessary(SQLiteDatabase db) {
+            db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                    " ADD COLUMN mtu INTEGER DEFAULT 0;");
+        }
+
+        private void upgradeForSimInfoIfNecssary(SQLiteDatabase db) {
+            try {
+                // Try to update the siminfo table. It might not be there.
+                db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
+                        " ADD COLUMN " + SubscriptionManager.MCC + " INTEGER DEFAULT 0;");
+                db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
+                        " ADD COLUMN " + SubscriptionManager.MNC + " INTEGER DEFAULT 0;");
+            } catch (SQLiteException e) {
+                if (DBG) {
+                    log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
+                            " The table will get created in onOpen.");
+                }
+            }
+        }
+
+        private void upgradeForSubscriptionInfoIfNecessary(SQLiteDatabase db) {
+            try {
+                // Try to update the siminfo table. It might not be there.
+                db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
+                        " ADD COLUMN " + SubscriptionManager.SUB_STATE
+                        + " INTEGER DEFAULT " + SubscriptionManager.ACTIVE + ";");
+                db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
+                        " ADD COLUMN " + SubscriptionManager.NETWORK_MODE
+                        + " INTEGER DEFAULT " + SubscriptionManager.DEFAULT_NW_MODE + ";");
+            } catch (SQLiteException e) {
+                if (DBG) {
+                    log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
+                            " The table will get created in onOpen.");
+                }
             }
         }
 
