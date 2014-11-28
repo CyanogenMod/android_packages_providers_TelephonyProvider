@@ -105,6 +105,8 @@ public class MmsSmsProvider extends ContentProvider {
     private static final int URI_SEARCH_MESSAGE                    = 20;
     private static final int URI_MESSAGES_COUNT                    = 21;
     private static final int URI_UPDATE_THREAD_DATE                = 22;
+    private static final int URI_UPDATE_THREAD                     = 23;
+
     // Escape character
     private static final char SEARCH_ESCAPE_CHARACTER = '!';
 
@@ -335,6 +337,8 @@ public class MmsSmsProvider extends ContentProvider {
         // "subject" and "recipient."  Multiple "recipient" parameters
         // may be present.
         URI_MATCHER.addURI(AUTHORITY, "threadID", URI_THREAD_ID);
+
+        URI_MATCHER.addURI(AUTHORITY, "update-thread/#", URI_UPDATE_THREAD);
 
         URI_MATCHER.addURI(AUTHORITY, "update-date", URI_UPDATE_THREAD_DATE);
 
@@ -1618,6 +1622,17 @@ public class MmsSmsProvider extends ContentProvider {
                 affectedRows = db.update(TABLE_THREADS, finalValues, selection, selectionArgs);
                 break;
             }
+
+            case URI_UPDATE_THREAD:
+                long threadId;
+                try {
+                    threadId = Long.parseLong(uri.getLastPathSegment());
+                } catch (NumberFormatException e) {
+                    Log.e(LOG_TAG, "Thread ID must be a long.");
+                    break;
+                }
+                MmsSmsDatabaseHelper.updateThread(db, threadId);
+                break;
 
             case URI_UPDATE_THREAD_DATE:
                 MmsSmsDatabaseHelper.updateThreadsDate(db, selection, selectionArgs);
