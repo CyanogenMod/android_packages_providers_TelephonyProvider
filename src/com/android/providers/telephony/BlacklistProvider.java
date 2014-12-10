@@ -38,7 +38,6 @@ import java.util.Locale;
 
 public class BlacklistProvider extends ContentProvider {
     private static final String TAG = "BlacklistProvider";
-    private static final boolean DEBUG = true;
 
     private static final String DATABASE_NAME = "blacklist.db";
     private static final int DATABASE_VERSION = 4;
@@ -149,7 +148,7 @@ public class BlacklistProvider extends ContentProvider {
 
         // Generate the body of the query.
         int match = sURIMatcher.match(uri);
-        if (DEBUG) {
+        if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "Query uri=" + uri + ", match=" + match);
         }
 
@@ -211,7 +210,7 @@ public class BlacklistProvider extends ContentProvider {
     @Override
     public Uri insert(Uri uri, ContentValues initialValues) {
         int match = sURIMatcher.match(uri);
-        if (DEBUG) {
+        if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "Insert uri=" + uri + ", match=" + match);
         }
 
@@ -231,7 +230,9 @@ public class BlacklistProvider extends ContentProvider {
             return null;
         }
 
-        if (DEBUG) Log.d(TAG, "inserted " + values + " rowID = " + rowID);
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            Log.d(TAG, "inserted " + values + " rowID = " + rowID);
+        }
         notifyChange();
 
         return ContentUris.withAppendedId(Blacklist.CONTENT_URI, rowID);
@@ -243,7 +244,7 @@ public class BlacklistProvider extends ContentProvider {
         int match = sURIMatcher.match(uri);
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
 
-        if (DEBUG) {
+        if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "Delete uri=" + uri + ", match=" + match);
         }
 
@@ -275,7 +276,9 @@ public class BlacklistProvider extends ContentProvider {
         }
 
         count = db.delete(BLACKLIST_TABLE, where, whereArgs);
-        if (DEBUG) Log.d(TAG, "delete result count " + count);
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            Log.d(TAG, "delete result count " + count);
+        }
 
         if (count > 0) {
             notifyChange();
@@ -290,7 +293,7 @@ public class BlacklistProvider extends ContentProvider {
         int match = sURIMatcher.match(uri);
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
 
-        if (DEBUG) {
+        if (Log.isLoggable(TAG, Log.VERBOSE)) {
             Log.v(TAG, "Update uri=" + uri + ", match=" + match);
         }
 
@@ -337,7 +340,9 @@ public class BlacklistProvider extends ContentProvider {
                 throw new UnsupportedOperationException("Cannot update that URI: " + uri);
         }
 
-        if (DEBUG) Log.d(TAG, "Update result count " + count);
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            Log.d(TAG, "Update result count " + count);
+        }
 
         if (count > 0) {
             notifyChange();
