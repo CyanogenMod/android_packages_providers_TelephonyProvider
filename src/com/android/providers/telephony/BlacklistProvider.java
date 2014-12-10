@@ -38,7 +38,7 @@ import java.util.Locale;
 
 public class BlacklistProvider extends ContentProvider {
     private static final String TAG = "BlacklistProvider";
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     private static final String DATABASE_NAME = "blacklist.db";
     private static final int DATABASE_VERSION = 4;
