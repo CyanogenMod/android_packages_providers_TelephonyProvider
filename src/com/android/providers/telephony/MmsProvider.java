@@ -598,6 +598,11 @@ public class MmsProvider extends ContentProvider {
             case MMS_DRM_STORAGE:
                 table = TABLE_DRM;
                 break;
+            case MMS_THREAD_ID:
+                notify = true;
+                table = TABLE_PDU;
+                extraSelection = Mms.THREAD_ID + "=" + uri.getLastPathSegment();
+                break;
             default:
                 Log.w(TAG, "No match for URI '" + uri + "'");
                 return 0;
@@ -944,6 +949,7 @@ public class MmsProvider extends ContentProvider {
     private static final int MMS_DRM_STORAGE_ID           = 18;
     private static final int MMS_THREADS                  = 19;
     private static final int MMS_PART_RESET_FILE_PERMISSION = 20;
+    private static final int MMS_THREAD_ID = 21;
 
     private static final UriMatcher
             sURLMatcher = new UriMatcher(UriMatcher.NO_MATCH);
@@ -970,6 +976,7 @@ public class MmsProvider extends ContentProvider {
         sURLMatcher.addURI("mms", "drm/#",      MMS_DRM_STORAGE_ID);
         sURLMatcher.addURI("mms", "threads",    MMS_THREADS);
         sURLMatcher.addURI("mms", "resetFilePerm/*",    MMS_PART_RESET_FILE_PERMISSION);
+        sURLMatcher.addURI("mms", "thread/#", MMS_THREAD_ID);
     }
 
     private SQLiteOpenHelper mOpenHelper;
