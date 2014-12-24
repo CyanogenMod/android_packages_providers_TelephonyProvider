@@ -279,6 +279,11 @@ public class MmsSmsProvider extends ContentProvider {
             + "d_rpt, rr, NULL AS err_type,"
             + "locked, NULL AS st, NULL AS text_only,"
             + "phone_id, NULL AS recipient_ids";
+
+    private static final String THREADS_BY_PHONE_ID_WHERE =
+            "_id in (select thread_id from sms where phone_id=? " +
+                    "union select thread_id from pdu where phone_id=?)";
+
     private static final String AUTHORITY = "mms-sms";
 
     static {
@@ -390,6 +395,14 @@ public class MmsSmsProvider extends ContentProvider {
                         selection = concatSelections(
                                 selection, Threads.TYPE + "=" + threadType);
                     }
+
+                    String phoneId = uri.getQueryParameter("phone_id");
+                    if (!TextUtils.isEmpty(phoneId)) {
+                        selection = concatSelections(selection,
+                                THREADS_BY_PHONE_ID_WHERE);
+                        selectionArgs = appendSelectionArgs(selectionArgs, phoneId, phoneId);
+                    }
+
                     cursor = getSimpleConversations(
                             projection, selection, selectionArgs, sortOrder);
                 } else {
@@ -784,6 +797,28 @@ public class MmsSmsProvider extends ContentProvider {
         } else {
             return selection1 + " AND " + selection2;
         }
+    }
+
+    /**
+     * Returns new array of currentArgs with newArgs appended to end
+     *
+     * @param currentArgs
+     * @param newArgs
+     * @return
+     */
+    private static String[] appendSelectionArgs(String currentArgs[], String... newArgs) {
+        if (newArgs == null) {
+            return currentArgs;
+        }
+        if(currentArgs == null) {
+            currentArgs = new String[]{};
+        }
+
+        String newArray[] = Arrays.copyOf(currentArgs, currentArgs.length + newArgs.length);
+        for (int i=0; i < newArgs.length; ++i) {
+            newArray[currentArgs.length+i] = newArgs[i];
+        }
+        return newArray;
     }
 
     /**
