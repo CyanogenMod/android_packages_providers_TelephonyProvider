@@ -251,7 +251,8 @@ public class TelephonyProvider extends ContentProvider
                 String[] s = configPref.split(",");
                 if (s.length == 3) {
                     Cursor c = db.query("carriers", new String[] { "_id" },
-                            "apn='" + s[0] + "' AND mcc='" + s[1] + "' AND mnc='" + s[2] + "'",
+                            "apn='" + s[0] + "' AND mcc='" + s[1] + "' AND mnc='" + s[2] +
+                            (s[3] != null ? "' AND protocol='" + s[3] : "") + "'",
                             null, null, null, null);
                     if (c.moveToFirst()) {
                         id = c.getInt(0);
@@ -734,7 +735,8 @@ public class TelephonyProvider extends ContentProvider
             String[] s = configPref.split(",");
             if (s.length == 3) {
                 Cursor c = mOpenHelper.getReadableDatabase().query("carriers", new String[] { "_id" },
-                        "apn='" + s[0] + "' AND mcc='" + s[1] + "' AND mnc='" + s[2] + "'",
+                        "apn='" + s[0] + "' AND mcc='" + s[1] + "' AND mnc='" + s[2] +
+                        (s[3] != null ? "' AND protocol='" + s[3] : "") + "'",
                         null, null, null, null);
                 if (c.moveToFirst()) {
                     id = c.getLong(0);
