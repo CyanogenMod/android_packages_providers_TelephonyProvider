@@ -249,9 +249,10 @@ public class TelephonyProvider extends ContentProvider
             String configPref = mContext.getResources().getString(R.string.config_preferred_apn, "");
             if (!TextUtils.isEmpty(configPref)) {
                 String[] s = configPref.split(",");
-                if (s.length == 3) {
+                if (s.length == 3 || s.length == 4) {
                     Cursor c = db.query("carriers", new String[] { "_id" },
-                            "apn='" + s[0] + "' AND mcc='" + s[1] + "' AND mnc='" + s[2] + "'",
+                            "apn='" + s[0] + "' AND mcc='" + s[1] + "' AND mnc='" + s[2] +
+                            (s.length == 4 ? "' AND protocol='" + s[3] : "") + "'",
                             null, null, null, null);
                     if (c.moveToFirst()) {
                         id = c.getInt(0);
@@ -732,9 +733,10 @@ public class TelephonyProvider extends ContentProvider
         String configPref = getContext().getResources().getString(R.string.config_preferred_apn, "");
         if (!TextUtils.isEmpty(configPref)) {
             String[] s = configPref.split(",");
-            if (s.length == 3) {
+            if (s.length == 3 || s.length == 4) {
                 Cursor c = mOpenHelper.getReadableDatabase().query("carriers", new String[] { "_id" },
-                        "apn='" + s[0] + "' AND mcc='" + s[1] + "' AND mnc='" + s[2] + "'",
+                        "apn='" + s[0] + "' AND mcc='" + s[1] + "' AND mnc='" + s[2] +
+                        (s.length == 4 ? "' AND protocol='" + s[3] : "") + "'",
                         null, null, null, null);
                 if (c.moveToFirst()) {
                     id = c.getLong(0);
