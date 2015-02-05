@@ -169,6 +169,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private final Context mContext;
     private LowStorageMonitor mLowStorageMonitor;
 
+    private static final String SUB_ID = "sub_id";
+    private static final String SMS_PRIORITY = "pri";
 
     private MmsSmsDatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -1602,6 +1604,14 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 + Mms.CREATOR + " TEXT");
         db.execSQL("ALTER TABLE " + SmsProvider.TABLE_SMS +" ADD COLUMN "
                 + Sms.CREATOR + " TEXT");
+        // If there is no "phone_id" column in sms table, this means the database
+        // may come from an KK platform, whose version is already 58.
+        if (!isColumnExist(db, SmsProvider.TABLE_SMS, Sms.PHONE_ID)) {
+            upgradeDatabaseToVersion58(db);
+            // Try to update the  "phone_id" column with existing "sub_id" column.
+            tryCopyColumn(db, SmsProvider.TABLE_SMS, SUB_ID, Sms.PHONE_ID);
+            tryCopyColumn(db, MmsProvider.TABLE_PDU, SUB_ID, Mms.PHONE_ID);
+        }
     }
 
     private void upgradeDatabaseToVersion60(SQLiteDatabase db) {
@@ -1620,6 +1630,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             + "rcs_message_id" + " INTEGER DEFAULT -1");
             db.execSQL("ALTER TABLE " + SmsProvider.TABLE_SMS + " ADD COLUMN "
                     + "priority INTEGER DEFAULT -1");
+            // Try to update the "priority" column with existing "pri" column.
+            tryCopyColumn(db, SmsProvider.TABLE_SMS, SMS_PRIORITY, Sms.PRIORITY);
         } catch (Exception e) {
             // Some db with version < 61 might already have priority column.
             // So gracefully catch exception.
@@ -1632,6 +1644,34 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         db.execSQL("DROP TRIGGER IF EXISTS update_threads_on_delete_part");
         db.execSQL("DROP TRIGGER IF EXISTS mms_words_delete");
         db.execSQL("DROP TRIGGER IF EXISTS pdu_update_thread_on_delete");
+    }
+
+    // Try to copy data from existing src column to new column which supposed
+    // to be added before calling this functin.
+    // If src or dest column not exsit, it will just bail out.
+    private void tryCopyColumn(SQLiteDatabase db, String table,
+            String srcColumn, String destColumn) {
+        if (isColumnExist(db, table, srcColumn) && isColumnExist(db, table, destColumn) ) {
+            db.execSQL("update " + table + " set " + destColumn + " = "
+                    + srcColumn);
+        }
+    }
+
+    private boolean isColumnExist(SQLiteDatabase db, String table, String column) {
+        Cursor cursor = db.query(table, null, null, null, null, null, null);
+        if (cursor != null) {
+            try {
+                cursor.getColumnIndexOrThrow(column);
+                return true;
+            } catch (IllegalArgumentException e) {
+                Log.e(TAG, "isColumnExsit: " + "table: " + table + " column: "
+                        + column + " IllegalArgumentException", e);
+                return false;
+            } finally {
+                cursor.close();
+            }
+        }
+        return false;
     }
 
     @Override
