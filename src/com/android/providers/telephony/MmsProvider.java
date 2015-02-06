@@ -18,11 +18,13 @@ package com.android.providers.telephony;
 
 import android.app.AppOpsManager;
 import android.content.ContentProvider;
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.UriMatcher;
 import android.database.Cursor;
+import android.database.MatrixCursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteOpenHelper;
@@ -44,10 +46,18 @@ import android.provider.Telephony.Threads;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.google.android.mms.MmsException;
+import com.google.android.mms.pdu.GenericPdu;
+import com.google.android.mms.pdu.PduComposer;
+import com.google.android.mms.pdu.RetrieveConf;
 import com.google.android.mms.pdu.PduHeaders;
+import com.google.android.mms.pdu.PduPersister;
+import com.google.android.mms.pdu.PduParser;
+import com.google.android.mms.pdu.SendReq;
 import com.google.android.mms.util.DownloadDrmHelper;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashSet;
@@ -67,6 +77,13 @@ public class MmsProvider extends ContentProvider {
 
     // The name of parts directory. The full dir is "app_parts".
     private static final String PARTS_DIR_NAME = "parts";
+    static final String COLUMN_PDU_PATH = "pdu_path";
+
+    private final static String[] PDU_COLUMNS = new String[] {
+        "_id",
+        "pdu_path",
+        "pdu_data"
+    };
 
     @Override
     public boolean onCreate() {
@@ -83,6 +100,55 @@ public class MmsProvider extends ContentProvider {
      */
     public static String getPduTable(boolean accessRestricted) {
         return accessRestricted ? VIEW_PDU_RESTRICTED : TABLE_PDU;
+    }
+
+    private byte[] getPduDataFromDB(int msgId, int msgType) {
+        Uri uri = ContentUris.withAppendedId(Mms.CONTENT_URI, msgId);
+        PduPersister persister = PduPersister.getPduPersister(getContext());
+        byte[] mmsData = null;
+        try {
+            if (Mms.MESSAGE_BOX_INBOX == msgType
+                    || Mms.MESSAGE_BOX_SENT == msgType) {
+                GenericPdu pdu = persister.load(uri);
+                if (pdu != null) {
+                    mmsData = new PduComposer(getContext(), pdu).make();
+                }
+            }
+        } catch (MmsException e) {
+            Log.e(TAG, "MmsException   e=" + e);
+        }
+        return mmsData;
+    }
+
+    private Cursor getPdus(int itemCount, int dataCount, String[] data) {
+        MatrixCursor cursor = new MatrixCursor(PDU_COLUMNS, 1);
+        long token = Binder.clearCallingIdentity();
+        SQLiteDatabase db = mOpenHelper.getReadableDatabase();
+        db.beginTransaction();
+        try {
+            for (int i = 0; i < dataCount; i++) {
+                int msgId = Integer.parseInt(data[i * itemCount]);
+                int msgType = Integer.parseInt(data[i * itemCount + 1]);
+                String pduPath = data[i * itemCount + 2];
+                byte[] pduData = getPduDataFromDB(msgId, msgType);
+                if (pduData == null || pduData.length == 0) {
+                    Log.e(TAG, "can't get msgId:" + msgId + " pdu data.");
+                    continue;
+                }
+                Object[] row = new Object[3];
+                row[0] = msgId;
+                row[1] = pduPath;
+                row[2] = pduData;
+                cursor.addRow(row);
+            }
+            db.setTransactionSuccessful();
+        } catch (Exception e) {
+            Log.e(TAG, "Exception  e =", e);
+        } finally {
+            Binder.restoreCallingIdentity(token);
+            db.endTransaction();
+        }
+        return cursor;
     }
 
     @Override
@@ -216,6 +282,19 @@ public class MmsProvider extends ContentProvider {
             case MMS_THREADS:
                 qb.setTables(pduTable + " group by thread_id");
                 break;
+            case MMS_GET_PDU:
+                int itemCount = Integer.parseInt(uri.getQueryParameter("item_count"));
+                int dataCount = Integer.parseInt(uri.getQueryParameter("data_count"));
+                String split = uri.getQueryParameter("data_split");
+                String[] data = null;
+                if (!TextUtils.isEmpty(uri.getQueryParameter("data"))) {
+                    data = uri.getQueryParameter("data").split(split);
+                    Log.d(TAG, "data.length :" + data.length);
+                    return getPdus(itemCount, dataCount, data);
+                } else {
+                    Log.e(TAG, "MMS get pdu date return null");
+                    return null;
+                }
             default:
                 Log.e(TAG, "query: invalid request: " + uri);
                 return null;
@@ -298,6 +377,119 @@ public class MmsProvider extends ContentProvider {
                 return "*/*";
         }
     }
+
+    private byte[] getPduDataFromFile(String pduPath) {
+        FileInputStream fileInputStream = null;
+        byte[] data = null;
+        try {
+            File pduFile = new File(pduPath);
+            data = new byte[(int)pduFile.length()];
+            fileInputStream = new FileInputStream(pduFile);
+            fileInputStream.read(data);
+        } catch (Exception e) {
+            Log.e(TAG, "read file exception :", e);
+        } finally {
+            try {
+                if (fileInputStream != null) {
+                    fileInputStream.close();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "close file stream exception :", e);
+            }
+        }
+        return data;
+    }
+
+    private Uri restorePduFile(Uri uri, String pduPath) {
+        Uri msgUri = null;
+        if (uri == null || TextUtils.isEmpty(pduPath)) {
+            return null;
+        }
+
+        try {
+            byte[] pduData = getPduDataFromFile(pduPath);
+            PduPersister pduPersister = PduPersister.getPduPersister(getContext());
+            if (pduData != null && pduData.length > 0) {
+                if (Mms.Sent.CONTENT_URI.equals(uri)
+                        || Mms.Inbox.CONTENT_URI.equals(uri)) {
+                    GenericPdu pdu = new PduParser(pduData, true).parse();
+                    msgUri = pduPersister.persist(
+                            pdu, uri, true, false, null);
+                } else {
+                    Log.e(TAG,"Unsupported uri :" + uri);
+                }
+            }
+        } catch (MmsException e) {
+            Log.e(TAG, "MmsException: ", e);
+        }
+        return msgUri;
+    }
+
+    private String getPduPath(String dir, ContentValues values) {
+        if (dir != null && values != null && values.containsKey(COLUMN_PDU_PATH)) {
+            String path = values.getAsString(COLUMN_PDU_PATH);
+            if (!TextUtils.isEmpty(path)) {
+                return dir + "/" + path;
+            }
+        }
+        return null;
+    }
+
+    private int restoreMms(Uri uri, ContentValues values, String dir) {
+        int count = 0;
+        Uri msgUri = restorePduFile(uri, getPduPath(dir, values));
+        if (msgUri != null) {
+            String selection = Mms._ID + "=" + msgUri.getLastPathSegment();
+            values.remove(COLUMN_PDU_PATH);
+            ContentValues finalValues = new ContentValues(values);
+            // now only support bulkInsert pdu table.
+            SQLiteDatabase db = mOpenHelper.getReadableDatabase();
+            count = db.update(TABLE_PDU, finalValues, selection, null);
+        }
+        return count;
+    }
+
+    @Override
+    public int bulkInsert(Uri uri, ContentValues[] values) {
+        String dir = uri.getQueryParameter("restore_dir");
+        if (TextUtils.isEmpty(dir)) {
+            return super.bulkInsert(uri, values);
+        }
+
+        Uri insertUri = null;
+        int match = sURLMatcher.match(uri);
+        switch (match) {
+            case MMS_INBOX:
+                insertUri = Mms.Inbox.CONTENT_URI;
+                break;
+            case MMS_SENT:
+                insertUri = Mms.Sent.CONTENT_URI;
+                break;
+            default:
+                return 0;
+        }
+
+        long token = Binder.clearCallingIdentity();
+        int count = 0;
+        SQLiteDatabase db = mOpenHelper.getReadableDatabase();
+        db.beginTransaction();
+        try {
+            for (ContentValues value : values) {
+                count += restoreMms(insertUri, value, dir);
+            }
+
+            Log.d(TAG, "bulkInsert  request count: " + values.length
+                    + " successfully count : " + count);
+            if (count == values.length) {
+                db.setTransactionSuccessful();
+            }
+            return count;
+        } finally {
+            db.endTransaction();
+            Binder.restoreCallingIdentity(token);
+        }
+    }
+
 
     @Override
     public Uri insert(Uri uri, ContentValues values) {
@@ -976,6 +1168,7 @@ public class MmsProvider extends ContentProvider {
     private static final int MMS_DRM_STORAGE_ID           = 18;
     private static final int MMS_THREADS                  = 19;
     private static final int MMS_PART_RESET_FILE_PERMISSION = 20;
+    private static final int MMS_GET_PDU                  = 21;
 
     private static final UriMatcher
             sURLMatcher = new UriMatcher(UriMatcher.NO_MATCH);
@@ -1002,6 +1195,7 @@ public class MmsProvider extends ContentProvider {
         sURLMatcher.addURI("mms", "drm/#",      MMS_DRM_STORAGE_ID);
         sURLMatcher.addURI("mms", "threads",    MMS_THREADS);
         sURLMatcher.addURI("mms", "resetFilePerm/*",    MMS_PART_RESET_FILE_PERMISSION);
+        sURLMatcher.addURI("mms", "get-pdu",    MMS_GET_PDU);
     }
 
     private SQLiteOpenHelper mOpenHelper;
