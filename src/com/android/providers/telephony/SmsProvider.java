@@ -642,7 +642,7 @@ public class SmsProvider extends ContentProvider {
         if (values == null) {
             return INSERT_SMS_INTO_ICC_FAIL;
         }
-        long subId = values.getAsLong(PhoneConstants.SUBSCRIPTION_KEY);
+        int subId = values.getAsInteger(PhoneConstants.SUBSCRIPTION_KEY);
         String address = values.getAsString(Sms.ADDRESS);
         String message = values.getAsString(Sms.BODY);
         int boxId = values.getAsInteger(SMS_BOX_ID);
@@ -656,7 +656,7 @@ public class SmsProvider extends ContentProvider {
             pdu = getDeliveryPdu(null, address, message, timestamp, subId);
             status = SmsManager.STATUS_ON_ICC_READ;
         }
-        boolean result = SmsManager.getSmsManagerForSubscriber(subId).copyMessageToIcc(null,
+        boolean result = SmsManager.getSmsManagerForSubscriptionId(subId).copyMessageToIcc(null,
                 pdu, status);
         return result ? INSERT_SMS_INTO_ICC_SUCCESS : INSERT_SMS_INTO_ICC_FAIL;
     }
@@ -665,7 +665,7 @@ public class SmsProvider extends ContentProvider {
      * Generate a Delivery PDU byte array. see getSubmitPdu for reference.
      */
     public static byte[] getDeliveryPdu(String scAddress, String destinationAddress, String message,
-            long date, long subscription) {
+            long date, int subscription) {
         if (isCdmaPhone(subscription)) {
             return getCdmaDeliveryPdu(scAddress, destinationAddress, message, date);
         } else {
@@ -674,7 +674,7 @@ public class SmsProvider extends ContentProvider {
         }
     }
 
-    private static boolean isCdmaPhone(long subscription) {
+    private static boolean isCdmaPhone(int subscription) {
         boolean isCdma = false;
         int activePhone = TelephonyManager.getDefault().getCurrentPhoneType(subscription);
         if (TelephonyManager.PHONE_TYPE_CDMA == activePhone) {
