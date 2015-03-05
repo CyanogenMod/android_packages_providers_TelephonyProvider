@@ -164,7 +164,7 @@ public class MmsSmsProvider extends ContentProvider {
               "service_center", "status", "subject", "type", "error_code", "priority", "rcs_path", "rcs_thumb_path", "is_rcs",
             "rcs_mime_type", "rcs_msg_type", "rcs_chat_type", "favourite", "rcs_is_burn", "rcs_id",
             "rcs_msg_state", "rcs_burn_flag", "rcs_is_download", "rcs_file_size", "rcs_play_time",
-            "rcs_burn_body","rcs_message_id" };
+            "rcs_burn_body","rcs_message_id", "rcs_nmsg_state" };
 
     // These are all the columns that appear in the "threads" table.
     private static final String[] THREADS_COLUMNS = {

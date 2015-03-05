@@ -853,7 +853,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "rcs_file_transfer_ext   TEXT," +
                    "rcs_file_transfer_id   TEXT, " +
                    "rcs_file_icon   TEXT,       " +
-                   "rcs_burn_flag   INTEGER,   " +
+                   "rcs_burn_flag   INTEGER  DEFAULT -1, " +
                    "rcs_barcycle   INTEGER,    " +
                    "rcs_header   TEXT,    " +
                    "is_rcs   INTEGER DEFAULT -1," +
@@ -865,7 +865,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "rcs_file_size INTEGER DEFAULT 0 ,  "+
                    "rcs_id INTEGER DEFAULT -1, "+
                    "rcs_thumb_path TEXT, " +
-                   "rcs_burn_body TEXT" +
+                   "rcs_burn_body TEXT, " +
+                   "rcs_nmsg_state TEXT " +
                    ");");
 
         /**
