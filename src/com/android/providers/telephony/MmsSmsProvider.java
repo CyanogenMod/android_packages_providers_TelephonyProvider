@@ -161,10 +161,11 @@ public class MmsSmsProvider extends ContentProvider {
     // table.
     private static final String[] SMS_ONLY_COLUMNS =
             { "address", "body", "person", "reply_path_present",
-              "service_center", "status", "subject", "type", "error_code", "priority", "rcs_path", "rcs_thumb_path", "is_rcs",
-            "rcs_mime_type", "rcs_msg_type", "rcs_chat_type", "favourite", "rcs_is_burn", "rcs_id",
-            "rcs_msg_state", "rcs_burn_flag", "rcs_is_download", "rcs_file_size", "rcs_play_time",
-            "rcs_burn_body","rcs_message_id", "rcs_nmsg_state" };
+              "service_center", "status", "subject", "type", "error_code", "priority", "rcs_path",
+              "rcs_thumb_path", "is_rcs", "rcs_mime_type", "rcs_msg_type", "rcs_chat_type",
+              "favourite", "rcs_is_burn", "rcs_id", "rcs_msg_state", "rcs_burn_flag",
+              "rcs_is_download", "rcs_file_size", "rcs_play_time", "rcs_burn_body",
+              "rcs_message_id", "rcs_nmsg_state" };
 
     // These are all the columns that appear in the "threads" table.
     private static final String[] THREADS_COLUMNS = {
@@ -242,21 +243,22 @@ public class MmsSmsProvider extends ContentProvider {
             " GROUP BY thread_id ORDER BY thread_id ASC, date DESC";
 
     private static final String SMS_PROJECTION = "'sms' AS transport_type, _id, thread_id,"
-            + "address, body,"
-            + "rcs_path ,"
-            + "rcs_thumb_path ,"
-            + "rcs_msg_type ,"
-            + "rcs_id ,"
+            + "address, body, phone_id,"
+            + "rcs_path, "
+            + "rcs_thumb_path, "
+            + "rcs_msg_type, "
+            + "rcs_id, "
             + "rcs_burn_flag, "
-            + "rcs_is_burn ,"
+            + "rcs_is_burn, "
             + "rcs_is_download, "
             + "rcs_msg_state, "
-            + "favourite ,"
-            + "rcs_file_size,"
-            + "rcs_play_time,"
-            + "rcs_message_id,"
-            + "rcs_chat_type,"
-            + "phone_id, date, date_sent, read, type,"
+            + "rcs_mime_type, "
+            + "favourite, "
+            + "rcs_file_size, "
+            + "rcs_play_time, "
+            + "rcs_message_id, "
+            + "rcs_chat_type, "
+            + "date, date_sent, read, type,"
             + "status, locked, NULL AS error_code,"
             + "NULL AS sub, NULL AS sub_cs, date, date_sent, read,"
             + "NULL as m_type,"
@@ -266,15 +268,20 @@ public class MmsSmsProvider extends ContentProvider {
             + "phone_id, NULL AS recipient_ids";
     private static final String MMS_PROJECTION = "'mms' AS transport_type, pdu._id, thread_id,"
             + "addr.address AS address, part.text as body, phone_id,"
-
-            + "NULL AS rcs_path ," + "NULL AS rcs_thumb_path ," +
-            "NULL AS rcs_msg_type , " + "NULL AS rcs_id ," + "NULL AS rcs_burn_flag ,"
-            + "NULL AS rcs_is_burn ," + "NULL AS rcs_is_download ," +
-            "NULL AS rcs_msg_state , " + "NULL AS favourite ," +   "NULL AS rcs_file_size,"+
-           "NULL AS rcs_play_time,"+
-            "NULL AS rcs_message_id,"+
-           "NULL AS rcs_chat_type,"
-
+            + "NULL AS rcs_path,"
+            + "NULL AS rcs_thumb_path,"
+            + "NULL AS rcs_msg_type,"
+            + "NULL AS rcs_id,"
+            + "NULL AS rcs_burn_flag,"
+            + "NULL AS rcs_is_burn,"
+            + "NULL AS rcs_is_download,"
+            + "NULL AS rcs_msg_state, "
+            + "NULL AS rcs_mime_type, "
+            + "NULL AS favourite,"
+            + "NULL AS rcs_file_size,"
+            + "NULL AS rcs_play_time,"
+            + "NULL AS rcs_message_id,"
+            + "NULL AS rcs_chat_type,"
             + "pdu.date * 1000 AS date, date_sent, read, NULL AS type,"
             + "NULL AS status, locked, NULL AS error_code,"
             + "sub, sub_cs, date, date_sent, read,"
@@ -287,6 +294,20 @@ public class MmsSmsProvider extends ContentProvider {
     private static final String MMS_PROJECTION_FOR_SUBJECT_SEARCH =
             "'mms' AS transport_type, pdu._id, thread_id,"
             + "addr.address AS address, pdu.sub as body, phone_id,"
+            + "NULL AS rcs_path,"
+            + "NULL AS rcs_thumb_path,"
+            + "NULL AS rcs_msg_type,"
+            + "NULL AS rcs_id,"
+            + "NULL AS rcs_burn_flag,"
+            + "NULL AS rcs_is_burn,"
+            + "NULL AS rcs_is_download,"
+            + "NULL AS rcs_msg_state, "
+            + "NULL AS rcs_mime_type, "
+            + "NULL AS favourite,"
+            + "NULL AS rcs_file_size,"
+            + "NULL AS rcs_play_time,"
+            + "NULL AS rcs_message_id,"
+            + "NULL AS rcs_chat_type,"
             + "pdu.date * 1000 AS date, date_sent, read, NULL AS type,"
             + "NULL AS status, locked, NULL AS error_code,"
             + "sub, sub_cs, date, date_sent, read,"
@@ -299,14 +320,20 @@ public class MmsSmsProvider extends ContentProvider {
     private static final String MMS_PROJECTION_FOR_NUMBER_SEARCH =
             "'mms' AS transport_type, pdu._id, thread_id,"
             + "addr.address AS address, NULL AS body, phone_id,"
-            + "NULL AS rcs_path ," + "NULL AS rcs_thumb_path ," +
-            "NULL AS rcs_msg_type , " + "NULL AS rcs_id ," + "NULL AS rcs_burn_flag ,"
-            + "NULL AS rcs_is_burn ," + "NULL AS rcs_is_download ," +
-               "NULL AS rcs_msg_state , " + "NULL AS favourite ," +   "NULL AS rcs_file_size,"+
-           "NULL AS rcs_play_time,"+
-            "NULL AS rcs_message_id,"+
-           "NULL AS rcs_chat_type,"
-
+            + "NULL AS rcs_path,"
+            + "NULL AS rcs_thumb_path,"
+            + "NULL AS rcs_msg_type,"
+            + "NULL AS rcs_id,"
+            + "NULL AS rcs_burn_flag,"
+            + "NULL AS rcs_is_burn,"
+            + "NULL AS rcs_is_download,"
+            + "NULL AS rcs_msg_state,"
+            + "NULL AS rcs_mime_type, "
+            + "NULL AS favourite,"
+            + "NULL AS rcs_file_size,"
+            + "NULL AS rcs_play_time,"
+            + "NULL AS rcs_message_id,"
+            + "NULL AS rcs_chat_type,"
             + "pdu.date * 1000 AS date, date_sent, read, NULL AS type,"
             + "NULL AS status, locked, NULL AS error_code,"
             + "sub, sub_cs, date, date_sent, read,"
