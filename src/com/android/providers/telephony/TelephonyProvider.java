@@ -437,6 +437,9 @@ public class TelephonyProvider extends ContentProvider
                                 " The table will get created in onOpen.");
                     }
                 }
+                // Update carriers table to add read_only column
+                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                        " ADD COLUMN read_only BOOLEAN DEFAULT 0;");
                 oldVersion = 17 << 16 | 6;
             }
             if (DBG) {
