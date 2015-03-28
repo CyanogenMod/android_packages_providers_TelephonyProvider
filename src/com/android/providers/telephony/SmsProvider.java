@@ -272,6 +272,13 @@ public class SmsProvider extends ContentProvider {
             orderBy = Sms.DEFAULT_SORT_ORDER;
         }
 
+        if (projectionIn != null) {
+                for (int i = 0; i < projectionIn.length; i++) {
+			if (projectionIn[i].equals("sub_id"))
+				projectionIn[i] = "phone_id";
+                }
+        }
+
         SQLiteDatabase db = mOpenHelper.getReadableDatabase();
         Cursor ret = qb.query(db, projectionIn, selection, selectionArgs,
                               null, null, orderBy);
@@ -603,6 +610,13 @@ public class SmsProvider extends ContentProvider {
             } else {
                 values = initialValues;
             }
+        }
+
+        if (values.containsKey("sub_id"))
+        {
+                int val = values.getAsInteger("sub_id");
+                values.remove("sub_id");
+                values.put("phone_id", val);
         }
 
         rowID = db.insert(table, "body", values);
