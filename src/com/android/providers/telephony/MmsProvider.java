@@ -207,6 +207,13 @@ public class MmsProvider extends ContentProvider {
             finalSortOrder = sortOrder;
         }
 
+        if (projection != null) {
+                for (int i = 0; i < projection.length; i++) {
+                        if (projection[i].equals("sub_id"))
+                                projection[i] = "phone_id";
+                }
+        }
+
         Cursor ret;
         try {
             SQLiteDatabase db = mOpenHelper.getReadableDatabase();
@@ -382,6 +389,13 @@ public class MmsProvider extends ContentProvider {
                         ProviderUtil.getPackageNamesByUid(getContext(), callerUid));
             }
 
+            if (finalValues.containsKey("sub_id"))
+            {
+                    int val = finalValues.getAsInteger("sub_id");
+                    finalValues.remove("sub_id");
+                    finalValues.put("phone_id", val);
+            }
+
             if ((rowId = db.insert(table, null, finalValues)) <= 0) {
                 Log.e(TAG, "MmsProvider.insert: failed!");
                 return null;
@@ -391,6 +405,13 @@ public class MmsProvider extends ContentProvider {
         } else if (table.equals(TABLE_ADDR)) {
             finalValues = new ContentValues(values);
             finalValues.put(Addr.MSG_ID, uri.getPathSegments().get(0));
+
+            if (finalValues.containsKey("sub_id"))
+            {
+                    int val = finalValues.getAsInteger("sub_id");
+                    finalValues.remove("sub_id");
+                    finalValues.put("phone_id", val);
+            }
 
             if ((rowId = db.insert(table, null, finalValues)) <= 0) {
                 Log.e(TAG, "Failed to insert address");
@@ -459,6 +480,13 @@ public class MmsProvider extends ContentProvider {
                                 "Unable to create new partFile: " + path);
                     }
                 }
+            }
+
+            if (finalValues.containsKey("sub_id"))
+            {
+                    int val = finalValues.getAsInteger("sub_id");
+                    finalValues.remove("sub_id");
+                    finalValues.put("phone_id", val);
             }
 
             if ((rowId = db.insert(table, null, finalValues)) <= 0) {
