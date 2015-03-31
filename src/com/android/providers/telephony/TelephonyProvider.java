@@ -437,9 +437,15 @@ public class TelephonyProvider extends ContentProvider
                                 " The table will get created in onOpen.");
                     }
                 }
-                // Update carriers table to add read_only column
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN read_only BOOLEAN DEFAULT 0;");
+                try {
+                    // read_only was present in CM11, but not in CM12. Add it if it's missing.
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN read_only BOOLEAN DEFAULT 0;");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade " + CARRIERS_TABLE + ": read_only already present.");
+                    }
+                }
                 oldVersion = 17 << 16 | 6;
             }
             if (DBG) {
