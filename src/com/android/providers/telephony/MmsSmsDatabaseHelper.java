@@ -29,8 +29,10 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.provider.BaseColumns;
 import android.provider.Telephony;
@@ -166,7 +168,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private static boolean sFakeLowStorageTest = false;     // for testing only
 
     static final String DATABASE_NAME = "mmssms.db";
-    static final int DATABASE_VERSION = 62;
+    static final int DATABASE_VERSION = 64;
     private final Context mContext;
     private LowStorageMonitor mLowStorageMonitor;
 
@@ -452,6 +454,12 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         createMmsTriggers(db);
         createWordsTables(db);
         createIndices(db);
+
+        SharedPreferences prefs = mContext.getSharedPreferences("migration", Context.MODE_PRIVATE);
+        if (!prefs.getBoolean("mms_phoneid_subid_conversion_done", false)
+                && migratePhoneIdToSubIdIfPossible(db)) {
+            prefs.edit().putBoolean("mms_phoneid_subid_conversion_done", true).apply();
+        }
     }
 
     // When upgrading the database we need to populate the words
@@ -604,6 +612,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    Mms.DELIVERY_TIME + " INTEGER," +
                    Mms.DELIVERY_REPORT + " INTEGER," +
                    Mms.LOCKED + " INTEGER DEFAULT 0," +
+                   Mms.SUBSCRIPTION_ID + " INTEGER DEFAULT " + SubscriptionManager.INVALID_SUBSCRIPTION_ID + ", " +
                    Mms.PHONE_ID + " INTEGER DEFAULT -1, " +
                    Mms.SEEN + " INTEGER DEFAULT 0," +
                    Mms.CREATOR + " TEXT," +
@@ -830,6 +839,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "body TEXT," +
                    "service_center TEXT," +
                    "locked INTEGER DEFAULT 0," +
+                   "sub_id INTEGER DEFAULT " + SubscriptionManager.INVALID_SUBSCRIPTION_ID + ", " +
                    "phone_id INTEGER DEFAULT -1, " +
                    "error_code INTEGER DEFAULT 0," +
                    "creator TEXT," +
@@ -849,6 +859,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "sequence INTEGER," + // the part number of this message
                    "destination_port INTEGER," +
                    "address TEXT," +
+                   "sub_id INTEGER DEFAULT " + SubscriptionManager.INVALID_SUBSCRIPTION_ID + ", " +
                    "phone_id INTEGER DEFAULT -1, " +
                    "pdu TEXT);"); // the raw PDU for this part
 
@@ -917,6 +928,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    PendingMessages.ERROR_CODE + " INTEGER," +
                    PendingMessages.RETRY_INDEX + " INTEGER NOT NULL DEFAULT 0," +
                    PendingMessages.DUE_TIME + " INTEGER," +
+                   PendingMessages.SUBSCRIPTION_ID + " INTEGER DEFAULT " +
+                   SubscriptionManager.INVALID_SUBSCRIPTION_ID + ", " +
                    PendingMessages.PHONE_ID + " INTEGER DEFAULT 0, " +
                    PendingMessages.LAST_TRY + " INTEGER);");
 
@@ -1354,6 +1367,38 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             } finally {
                 db.endTransaction();
             }
+            // fall through
+        case 62:
+            if (currentVersion <= 62) {
+                return;
+            }
+
+            db.beginTransaction();
+            try {
+                upgradeDatabaseToVersion63(db);
+                db.setTransactionSuccessful();
+            } catch (Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+                break;
+            } finally {
+                db.endTransaction();
+            }
+            // fall through
+        case 63:
+            if (currentVersion <= 63) {
+                return;
+            }
+
+            db.beginTransaction();
+            try {
+                upgradeDatabaseToVersion64(db);
+                db.setTransactionSuccessful();
+            } catch (Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+                break;
+            } finally {
+                db.endTransaction();
+            }
             return;
         }
 
@@ -1570,6 +1615,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 + Mms.CREATOR + " TEXT");
         db.execSQL("ALTER TABLE " + SmsProvider.TABLE_SMS +" ADD COLUMN "
                 + Sms.CREATOR + " TEXT");
+
         // If there is no "phone_id" column in sms table, this means the database
         // may come from an KK platform, whose version is already 58.
         if (!isColumnExist(db, SmsProvider.TABLE_SMS, Sms.PHONE_ID)) {
@@ -1599,10 +1645,56 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     }
 
     private void upgradeDatabaseToVersion62(SQLiteDatabase db) {
+        if (isCM11DB(db)) {
+            // CM11 was 60, which means we skipped a few updates...
+            try {
+                upgradeDatabaseToVersion58(db);
+            } catch (Exception e) { }
+            try {
+                upgradeDatabaseToVersion59(db);
+            } catch (Exception e) { }
+            try {
+                upgradeDatabaseToVersion60(db);
+            } catch (Exception e) { }
+            try {
+                upgradeDatabaseToVersion61(db);
+            } catch (Exception e) { }
+        }
+    }
+
+    private void upgradeDatabaseToVersion63(SQLiteDatabase db) {
         // Improve the performance of deleting Mms.
         db.execSQL("DROP TRIGGER IF EXISTS update_threads_on_delete_part");
         db.execSQL("DROP TRIGGER IF EXISTS mms_words_delete");
         db.execSQL("DROP TRIGGER IF EXISTS pdu_update_thread_on_delete");
+    }
+
+    private void upgradeDatabaseToVersion64(SQLiteDatabase db) {
+        try {
+            db.execSQL("ALTER TABLE " + MmsProvider.TABLE_PDU +" ADD COLUMN "
+                    + Mms.SUBSCRIPTION_ID + " INTEGER DEFAULT -1");
+        } catch (SQLiteException e) {
+            // ignore (DB was older than version 58), we'll remove the data later
+        }
+        db.execSQL("ALTER TABLE " + MmsSmsProvider.TABLE_PENDING_MSG +" ADD COLUMN "
+                + "pending_sub_id" + " INTEGER DEFAULT 0");
+        try {
+            db.execSQL("ALTER TABLE " + SmsProvider.TABLE_SMS +" ADD COLUMN "
+                    + Sms.SUBSCRIPTION_ID + " INTEGER DEFAULT -1");
+        } catch (SQLiteException e) {
+            // see above
+        }
+        try {
+            db.execSQL("ALTER TABLE " + SmsProvider.TABLE_RAW +" ADD COLUMN "
+                    + Sms.SUBSCRIPTION_ID + " INTEGER DEFAULT -1");
+        } catch (SQLiteException e) {
+            // see above
+        }
+        // remove old data from the sub_id column (if present), it was already copied
+        // over to the phone_id column in upgradeDatabaseToVersion59
+        db.execSQL("UPDATE " + MmsProvider.TABLE_PDU + " SET " + Mms.SUBSCRIPTION_ID + " = -1");
+        db.execSQL("UPDATE " + SmsProvider.TABLE_SMS + " SET " + Sms.SUBSCRIPTION_ID + " = -1");
+        db.execSQL("UPDATE " + SmsProvider.TABLE_RAW + " SET " + Sms.SUBSCRIPTION_ID + " = -1");
     }
 
     // Try to copy data from existing src column to new column which supposed
@@ -1910,6 +2002,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 Mms.DELIVERY_TIME + " INTEGER," +
                 Mms.DELIVERY_REPORT + " INTEGER," +
                 Mms.LOCKED + " INTEGER DEFAULT 0," +
+                Mms.SUBSCRIPTION_ID + " INTEGER DEFAULT " + SubscriptionManager.INVALID_SUBSCRIPTION_ID + ", " +
                 Mms.PHONE_ID + " INTEGER DEFAULT -1, " +
                 Mms.SEEN + " INTEGER DEFAULT 0," +
                 Mms.TEXT_ONLY + " INTEGER DEFAULT 0" +
@@ -1946,5 +2039,53 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "  (SELECT DISTINCT pdu.thread_id FROM part " +
                    "   JOIN pdu ON pdu._id=part.mid " +
                    "   WHERE part.ct != 'text/plain' AND part.ct != 'application/smil')");
+    }
+
+    // Determine whether this database has CM11 columns...
+    private boolean isCM11DB(SQLiteDatabase db) {
+        Cursor c = null;
+        try {
+            final String query = "SELECT sub_id, pri FROM sms";
+            c = db.rawQuery(query, null);
+        } catch (Exception e) {
+        } finally {
+            if (c != null) {
+                c.close();
+            }
+        }
+        return c != null;
+    }
+
+    private boolean migratePhoneIdToSubIdIfPossible(SQLiteDatabase db) {
+        boolean migratedAnyData = false;
+        Cursor simCursor = mContext.getContentResolver().query(SubscriptionManager.CONTENT_URI,
+                new String[] {
+                    SubscriptionManager.UNIQUE_KEY_SUBSCRIPTION_ID,
+                    SubscriptionManager.SIM_SLOT_INDEX
+                }, null, null, SubscriptionManager.UNIQUE_KEY_SUBSCRIPTION_ID + " ASC");
+        if (simCursor != null) {
+            try {
+                simCursor.moveToFirst();
+                while (!simCursor.isAfterLast()) {
+                    int subId = simCursor.getInt(0);
+                    int phoneId = simCursor.getInt(1);
+                    db.execSQL("UPDATE " + MmsProvider.TABLE_PDU + " SET " + Mms.SUBSCRIPTION_ID
+                            + " = " + subId + " WHERE " + Mms.PHONE_ID + " = " + phoneId + " AND "
+                            + Mms.SUBSCRIPTION_ID + " <= 0");
+                    db.execSQL("UPDATE " + SmsProvider.TABLE_SMS + " SET " + Sms.SUBSCRIPTION_ID
+                            + " = " + subId + " WHERE " + Sms.PHONE_ID + " = " + phoneId + " AND "
+                            + Sms.SUBSCRIPTION_ID + " <= 0");
+                    db.execSQL("UPDATE " + SmsProvider.TABLE_RAW + " SET " + Sms.SUBSCRIPTION_ID
+                            + " = " + subId + " WHERE " + Sms.PHONE_ID + " = " + phoneId + " AND "
+                            + Sms.SUBSCRIPTION_ID + " <= 0");
+                    migratedAnyData = true;
+                    simCursor.moveToNext();
+                }
+            } finally {
+                simCursor.close();
+            }
+        }
+
+        return migratedAnyData;
     }
 }
