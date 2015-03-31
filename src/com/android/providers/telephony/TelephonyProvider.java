@@ -677,6 +677,20 @@ public class TelephonyProvider extends ContentProvider
     private long getPreferredApnId(int subId) {
         SharedPreferences sp = getContext().getSharedPreferences(
                 PREF_FILE + subId, Context.MODE_PRIVATE);
+        if (!sp.contains(COLUMN_APN_ID)) {
+            //Migrate from KK
+            sp = getContext().getSharedPreferences(
+                    PREF_FILE, Context.MODE_PRIVATE);
+            int phoneId = SubscriptionManager.getPhoneId(subId);
+            if (sp != null && sp.contains(COLUMN_APN_ID + phoneId)) {
+                long id = sp.getLong(COLUMN_APN_ID + phoneId, -1);
+                setPreferredApnId(id, subId);
+                SharedPreferences.Editor editor = sp.edit();
+                editor.remove(COLUMN_APN_ID+phoneId);
+                editor.commit();
+                return id;
+            }
+        }
         return sp.getLong(COLUMN_APN_ID, -1);
     }
 
