@@ -144,7 +144,7 @@ public class MmsSmsProvider extends ContentProvider {
     // SMS ("sms") message tables.
     private static final String[] MMS_SMS_COLUMNS =
             { BaseColumns._ID, Mms.DATE, Mms.DATE_SENT, Mms.READ, Mms.THREAD_ID, Mms.LOCKED,
-                    Mms.PHONE_ID, "favourite"};
+                    Mms.SUBSCRIPTION_ID, Mms.PHONE_ID, "favourite"};
 
     // These are the columns that appear only in the MMS message
     // table.
@@ -243,7 +243,7 @@ public class MmsSmsProvider extends ContentProvider {
             " GROUP BY thread_id ORDER BY thread_id ASC, date DESC";
 
     private static final String SMS_PROJECTION = "'sms' AS transport_type, _id, thread_id,"
-            + "address, body, phone_id,"
+            + "address, body, sub_id, phone_id,"
             + "rcs_path, "
             + "rcs_thumb_path, "
             + "rcs_msg_type, "
@@ -264,10 +264,9 @@ public class MmsSmsProvider extends ContentProvider {
             + "NULL as m_type,"
             + "NULL AS msg_box,"
             + "NULL AS d_rpt, NULL AS rr, NULL AS err_type,"
-            + "locked, NULL AS st, NULL AS text_only,"
-            + "phone_id, NULL AS recipient_ids";
+            + "locked, NULL AS st, NULL AS text_only, NULL AS recipient_ids";
     private static final String MMS_PROJECTION = "'mms' AS transport_type, pdu._id, thread_id,"
-            + "addr.address AS address, part.text as body, phone_id,"
+            + "addr.address AS address, part.text as body, sub_id, phone_id,"
             + "NULL AS rcs_path,"
             + "NULL AS rcs_thumb_path,"
             + "NULL AS rcs_msg_type,"
@@ -288,12 +287,11 @@ public class MmsSmsProvider extends ContentProvider {
             + "m_type,"
             + "pdu.msg_box AS msg_box,"
             + "d_rpt, rr, NULL AS err_type,"
-            + "locked, NULL AS st, NULL AS text_only,"
-            + "phone_id, NULL AS recipient_ids";
+            + "locked, NULL AS st, NULL AS text_only, NULL AS recipient_ids";
 
     private static final String MMS_PROJECTION_FOR_SUBJECT_SEARCH =
             "'mms' AS transport_type, pdu._id, thread_id,"
-            + "addr.address AS address, pdu.sub as body, phone_id,"
+            + "addr.address AS address, pdu.sub as body, sub_id, phone_id,"
             + "NULL AS rcs_path,"
             + "NULL AS rcs_thumb_path,"
             + "NULL AS rcs_msg_type,"
@@ -314,12 +312,11 @@ public class MmsSmsProvider extends ContentProvider {
             + "m_type,"
             + "pdu.msg_box AS msg_box,"
             + "d_rpt, rr, NULL AS err_type,"
-            + "locked, NULL AS st, NULL AS text_only,"
-            + "phone_id, NULL AS recipient_ids";
+            + "locked, NULL AS st, NULL AS text_only, NULL AS recipient_ids";
 
     private static final String MMS_PROJECTION_FOR_NUMBER_SEARCH =
             "'mms' AS transport_type, pdu._id, thread_id,"
-            + "addr.address AS address, NULL AS body, phone_id,"
+            + "addr.address AS address, NULL AS body, sub_id, phone_id,"
             + "NULL AS rcs_path,"
             + "NULL AS rcs_thumb_path,"
             + "NULL AS rcs_msg_type,"
@@ -340,12 +337,14 @@ public class MmsSmsProvider extends ContentProvider {
             + "m_type,"
             + "pdu.msg_box AS msg_box,"
             + "d_rpt, rr, NULL AS err_type,"
-            + "locked, NULL AS st, NULL AS text_only,"
-            + "phone_id, NULL AS recipient_ids";
+            + "locked, NULL AS st, NULL AS text_only, NULL AS recipient_ids";
 
     private static final String THREADS_BY_PHONE_ID_WHERE =
             "_id in (select thread_id from sms where phone_id=? " +
                     "union select thread_id from pdu where phone_id=?)";
+    private static final String THREADS_BY_SUB_ID_WHERE =
+            "_id in (select thread_id from sms where sub_id=? " +
+                    "union select thread_id from pdu where sub_id=?)";
 
     private static final String AUTHORITY = "mms-sms";
 
@@ -470,6 +469,13 @@ public class MmsSmsProvider extends ContentProvider {
                         selection = concatSelections(selection,
                                 THREADS_BY_PHONE_ID_WHERE);
                         selectionArgs = appendSelectionArgs(selectionArgs, phoneId, phoneId);
+                    }
+
+                    String subId = uri.getQueryParameter("sub_id");
+                    if (!TextUtils.isEmpty(subId)) {
+                        selection = concatSelections(selection,
+                                THREADS_BY_SUB_ID_WHERE);
+                        selectionArgs = appendSelectionArgs(selectionArgs, subId, subId);
                     }
 
                     cursor = getSimpleConversations(
@@ -1250,6 +1256,7 @@ public class MmsSmsProvider extends ContentProvider {
         columnsPresentInTable.add("pdu.date AS date");
         columnsPresentInTable.add("pdu.read AS read");
         columnsPresentInTable.add("pdu.phone_id AS phone_id");
+        columnsPresentInTable.add("pdu.sub_id AS sub_id");
         columnsPresentInTable.add("recipient_ids");
 
         columnsPresentInTable.add(PendingMessages.ERROR_TYPE);
@@ -1280,6 +1287,7 @@ public class MmsSmsProvider extends ContentProvider {
         columnsPresentInSmsTable.add("sms.read AS read");
         columnsPresentInSmsTable.add("sms.type AS type");
         columnsPresentInSmsTable.add("sms.phone_id AS phone_id");
+        columnsPresentInSmsTable.add("sms.sub_id AS sub_id");
         columnsPresentInSmsTable.add("recipient_ids");
 
         String smsSubQuery = smsQueryBuilder.buildUnionSubQuery(
@@ -1440,6 +1448,8 @@ public class MmsSmsProvider extends ContentProvider {
                 newProjection[i] = "pdu.read AS read";
             } else if (old[i].equals("phone_id")) {
                 newProjection[i] = "pdu.phone_id AS phone_id";
+            } else if (old[i].equals("sub_id")) {
+                newProjection[i] = "pdu.sub_id AS sub_id";
             } else {
                 newProjection[i] = old[i];
             }
@@ -1465,6 +1475,8 @@ public class MmsSmsProvider extends ContentProvider {
                 newProjection[i] = "sms.type AS type";
             } else if (old[i].equals("phone_id")) {
                 newProjection[i] = "sms.phone_id AS phone_id";
+            } else if (old[i].equals("sub_id")) {
+                newProjection[i] = "sms.sub_id AS sub_id";
             } else {
                 newProjection[i] = old[i];
             }
