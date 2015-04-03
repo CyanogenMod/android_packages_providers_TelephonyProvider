@@ -443,7 +443,7 @@ public class MmsProvider extends ContentProvider {
             values.remove(COLUMN_PDU_PATH);
             ContentValues finalValues = new ContentValues(values);
             // now only support bulkInsert pdu table.
-            SQLiteDatabase db = mOpenHelper.getReadableDatabase();
+            SQLiteDatabase db = mOpenHelper.getWritableDatabase();
             count = db.update(TABLE_PDU, finalValues, selection, null);
         }
         return count;
@@ -471,7 +471,7 @@ public class MmsProvider extends ContentProvider {
 
         long token = Binder.clearCallingIdentity();
         int count = 0;
-        SQLiteDatabase db = mOpenHelper.getReadableDatabase();
+        SQLiteDatabase db = mOpenHelper.getWritableDatabase();
         db.beginTransaction();
         try {
             for (ContentValues value : values) {
