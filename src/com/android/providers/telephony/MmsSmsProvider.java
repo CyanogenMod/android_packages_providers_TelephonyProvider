@@ -1727,6 +1727,7 @@ public class MmsSmsProvider extends ContentProvider {
                     Log.e(LOG_TAG, "Thread ID must be a long.");
                     break;
                 }
+                updateConversationUnread(db, threadId);
                 MmsSmsDatabaseHelper.updateThread(db, threadId);
                 break;
 
@@ -1746,6 +1747,16 @@ public class MmsSmsProvider extends ContentProvider {
                     MmsSms.CONTENT_URI, null, true, UserHandle.USER_ALL);
         }
         return affectedRows;
+    }
+
+    private void updateConversationUnread(SQLiteDatabase db, long threadId) {
+        db.execSQL(
+                "  UPDATE threads SET read = " +
+                        "     CASE (SELECT COUNT(*) FROM (SELECT read FROM " +
+                        "     sms WHERE read = 0 AND thread_id = " + threadId +
+                        "     UNION ALL SELECT read FROM pdu WHERE read = 0 " +
+                        "     AND thread_id = " + threadId +"))" +
+                        "     WHEN 0 THEN 1 ELSE 0 END;");
     }
 
     private int updateConversation(
