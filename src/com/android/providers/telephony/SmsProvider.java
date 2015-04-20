@@ -115,7 +115,22 @@ public class SmsProvider extends ContentProvider {
         "locked",                       // Always 0 (false).
         "error_code",                   // Always 0
         "_id",
-        "phone_id"
+        "phone_id",
+        //RCS column
+        "rcs_path" ,
+        "rcs_thumb_path" ,
+        "rcs_msg_type" ,
+        "rcs_id",
+        "rcs_burn_flag",
+        "rcs_is_burn",
+        "rcs_msg_state",
+        "rcs_is_download",
+        "rcs_mime_type",
+        "favourite",
+        "rcs_file_size",
+        "rcs_play_time",
+        "rcs_message_id",
+        "rcs_chat_type"
     };
 
     @Override
@@ -299,7 +314,7 @@ public class SmsProvider extends ContentProvider {
                 type = Sms.MESSAGE_TYPE_OUTBOX;
                 break;
         }
-        Object[] row = new Object[14];
+        Object[] row = new Object[28];
         row[0] = message.getServiceCenterAddress();
         row[1] = (type == Sms.MESSAGE_TYPE_INBOX)
                 ? message.getDisplayOriginatingAddress()
@@ -316,6 +331,21 @@ public class SmsProvider extends ContentProvider {
         row[11] = 0;      // error_code
         row[12] = id;
         row[13] = phoneId;
+        //RCS COLUMN default values
+        row[14] = null;
+        row[15] = null;
+        row[16] = -1;
+        row[17] = -1;
+        row[18] = -1;
+        row[19] = null;
+        row[20] = null;
+        row[21] = 0;
+        row[22] = null;
+        row[23] = 0;
+        row[24] = 0;
+        row[25] = 0;
+        row[26] = null;
+        row[27] = null;
         return row;
     }
 
