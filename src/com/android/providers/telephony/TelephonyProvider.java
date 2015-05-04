@@ -377,16 +377,7 @@ public class TelephonyProvider extends ContentProvider
                 oldVersion = 9 << 16 | 6;
             }
             if (oldVersion < (10 << 16 | 6)) {
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN profile_id INTEGER DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN modem_cognitive BOOLEAN DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN max_conns INTEGER DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN wait_time INTEGER DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN max_conns_time INTEGER DEFAULT 0;");
+                upgradeForProfileIdIfNecessary(db);
                 oldVersion = 10 << 16 | 6;
             }
             if (oldVersion < (11 << 16 | 6)) {
@@ -428,6 +419,23 @@ public class TelephonyProvider extends ContentProvider
             }
             if (oldVersion < (17 << 16 | 6)) {
                 try {
+                    upgradeForProfileIdIfNecessary(db);
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade " + CARRIERS_TABLE + ": profile_id already present.");
+                    }
+                }
+
+                try {
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN mtu INTEGER DEFAULT 0;");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade " + CARRIERS_TABLE + ": mtu already present.");
+                    }
+                }
+
+                try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
                             " ADD COLUMN " + SubscriptionManager.CARRIER_NAME + " TEXT DEFAULT '';");
@@ -437,6 +445,7 @@ public class TelephonyProvider extends ContentProvider
                                 " The table will get created in onOpen.");
                     }
                 }
+
                 try {
                     // read_only was present in CM11, but not in CM12. Add it if it's missing.
                     db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
@@ -1245,6 +1254,19 @@ public class TelephonyProvider extends ContentProvider
         }
 
         return count;
+    }
+
+    private static void upgradeForProfileIdIfNecessary(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN profile_id INTEGER DEFAULT 0;");
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN modem_cognitive BOOLEAN DEFAULT 0;");
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN max_conns INTEGER DEFAULT 0;");
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN wait_time INTEGER DEFAULT 0;");
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN max_conns_time INTEGER DEFAULT 0;");
     }
 
     private void checkPermission() {
