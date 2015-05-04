@@ -377,16 +377,7 @@ public class TelephonyProvider extends ContentProvider
                 oldVersion = 9 << 16 | 6;
             }
             if (oldVersion < (10 << 16 | 6)) {
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN profile_id INTEGER DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN modem_cognitive BOOLEAN DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN max_conns INTEGER DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN wait_time INTEGER DEFAULT 0;");
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
-                        " ADD COLUMN max_conns_time INTEGER DEFAULT 0;");
+                upgradeForProfileIdIfNecessary(db);
                 oldVersion = 10 << 16 | 6;
             }
             if (oldVersion < (11 << 16 | 6)) {
@@ -446,6 +437,7 @@ public class TelephonyProvider extends ContentProvider
                         log("onUpgrade " + CARRIERS_TABLE + ": read_only already present.");
                     }
                 }
+                upgradeForProfileIdIfNecessary(db);
                 oldVersion = 17 << 16 | 6;
             }
             if (DBG) {
@@ -1245,6 +1237,19 @@ public class TelephonyProvider extends ContentProvider
         }
 
         return count;
+    }
+
+    private static void upgradeForProfileIdIfNecessary(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN profile_id INTEGER DEFAULT 0;");
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN modem_cognitive BOOLEAN DEFAULT 0;");
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN max_conns INTEGER DEFAULT 0;");
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN wait_time INTEGER DEFAULT 0;");
+        db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                " ADD COLUMN max_conns_time INTEGER DEFAULT 0;");
     }
 
     private void checkPermission() {
