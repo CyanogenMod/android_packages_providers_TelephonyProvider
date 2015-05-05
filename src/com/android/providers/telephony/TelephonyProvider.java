@@ -63,7 +63,7 @@ public class TelephonyProvider extends ContentProvider
     private static final boolean DBG = true;
     private static final boolean VDBG = false;
 
-    private static final int DATABASE_VERSION = 17 << 16;
+    private static final int DATABASE_VERSION = 18 << 16;
     private static final int URL_UNKNOWN = 0;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
@@ -447,6 +447,36 @@ public class TelephonyProvider extends ContentProvider
                     }
                 }
                 oldVersion = 17 << 16 | 6;
+            }
+            if (oldVersion < (18 << 16 | 6)) {
+                try {
+                    // Add ppp_number field if it's missing
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN ppp_number TEXT DEFAULT '';");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade " + CARRIERS_TABLE + ": ppp_number already present.");
+                    }
+                }
+                try {
+                    // Add localized_name field if it's missing
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN localized_name TEXT DEFAULT '';");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade " + CARRIERS_TABLE + ": localized_name already present.");
+                    }
+                }
+                try {
+                    // Add visit_area field if it's missing
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN visit_area TEXT DEFAULT '';");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade " + CARRIERS_TABLE + ": visit_area already present.");
+                    }
+                }
+                oldVersion = 18 << 16 | 6;
             }
             if (DBG) {
                 log("dbh.onUpgrade:- db=" + db + " oldV=" + oldVersion + " newV=" + newVersion);
