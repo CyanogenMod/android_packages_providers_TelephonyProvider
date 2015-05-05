@@ -435,6 +435,36 @@ public class TelephonyProvider extends ContentProvider
                     }
                 }
 
+                 try {
+                    // Add ppp_number field if it's missing
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN ppp_number TEXT DEFAULT '';");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade " + CARRIERS_TABLE + ": ppp_number already present.");
+                    }
+                }
+
+                try {
+                    // Add localized_name field if it's missing
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN localized_name TEXT DEFAULT '';");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade " + CARRIERS_TABLE + ": localized_name already present.");
+                    }
+                }
+
+                try {
+                    // Add visit_area field if it's missing
+                    db.execSQL("ALTER TABLE " + CARRIERS_TABLE +
+                            " ADD COLUMN visit_area TEXT DEFAULT '';");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade " + CARRIERS_TABLE + ": visit_area already present.");
+                    }
+                }
+
                 try {
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE +
