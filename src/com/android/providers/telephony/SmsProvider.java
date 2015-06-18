@@ -115,7 +115,8 @@ public class SmsProvider extends ContentProvider {
         "locked",                       // Always 0 (false).
         "error_code",                   // Always 0
         "_id",
-        "phone_id"
+        "phone_id",
+        "sub_id"
     };
 
     @Override
@@ -299,7 +300,7 @@ public class SmsProvider extends ContentProvider {
                 type = Sms.MESSAGE_TYPE_OUTBOX;
                 break;
         }
-        Object[] row = new Object[14];
+        Object[] row = new Object[15];
         row[0] = message.getServiceCenterAddress();
         row[1] = (type == Sms.MESSAGE_TYPE_INBOX)
                 ? message.getDisplayOriginatingAddress()
@@ -316,6 +317,7 @@ public class SmsProvider extends ContentProvider {
         row[11] = 0;      // error_code
         row[12] = id;
         row[13] = phoneId;
+        row[14] = message.getSubId();
         return row;
     }
 
