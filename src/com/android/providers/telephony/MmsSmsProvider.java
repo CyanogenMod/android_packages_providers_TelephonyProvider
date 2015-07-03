@@ -232,14 +232,24 @@ public class MmsSmsProvider extends ContentProvider {
             MmsSms.TYPE_DISCRIMINATOR_COLUMN, "count(*) as " + MmsSms.TRANSPORT_TYPE_COUNT_COLUMN
     };
 
+    private static final int ID             = 0;
+    private static final int DATE           = 1;
+    private static final int MESSAGE_COUNT  = 2;
+    private static final int RECIPIENT_IDS  = 3;
+    private static final int SNIPPET        = 4;
+    private static final int SNIPPET_CS     = 5;
+    private static final int READ           = 6;
+    private static final int ERROR          = 7;
+    private static final int HAS_ATTACHMENT = 8;
+//SELECT sms._id AS _id,thread_id,address,body,date,date_sent,index_text,words._id
     // This code queries the sms and mms tables and returns a unified result set
     // of text matches.  We query the sms table which is pretty simple.  We also
     // query the pdu, part and addr table to get the mms result.  Notet we're
     // using a UNION so we have to have the same number of result columns from
     // both queries.
     private static final String SMS_MMS_QUERY =
-            SMS_QUERY + " UNION " + MMS_QUERY +
-            " GROUP BY thread_id ORDER BY thread_id ASC, date DESC";
+            "select threads._id, threads.date, message_count, recipient_ids, snippet, snippet_cs, read, error, has_attachment, body from (" + SMS_QUERY + " UNION " + MMS_QUERY + ") as f,threads where threads._id=thread_id" +
+            " GROUP BY thread_id ORDER BY thread_id ASC, f.date DESC";
 
     private static final String SMS_PROJECTION = "'sms' AS transport_type, _id, thread_id,"
             + "address, body, sub_id, phone_id, date, date_sent, read, type,"
