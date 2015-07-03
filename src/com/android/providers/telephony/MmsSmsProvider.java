@@ -238,8 +238,10 @@ public class MmsSmsProvider extends ContentProvider {
     // using a UNION so we have to have the same number of result columns from
     // both queries.
     private static final String SMS_MMS_QUERY =
-            SMS_QUERY + " UNION " + MMS_QUERY +
-            " GROUP BY thread_id ORDER BY thread_id ASC, date DESC";
+            "select threads._id, threads.date, message_count, recipient_ids,"
+            + "snippet, snippet_cs, read, error, has_attachment, body, * from "
+            + "(" + SMS_QUERY + " UNION " + MMS_QUERY + ") as smsmms,threads where "
+            + "threads._id=thread_id GROUP BY thread_id ORDER BY thread_id ASC, smsmms.date DESC";
 
     private static final String SMS_PROJECTION = "'sms' AS transport_type, _id, thread_id,"
             + "address, body, sub_id, phone_id, date, date_sent, read, type,"
