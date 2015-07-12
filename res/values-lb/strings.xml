@@ -17,4 +17,5 @@
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <string name="app_label" product="tablet">Konfiguratioun vum Mobilnetzwierk</string>
   <string name="app_label" product="default">Telefon- an SMS-Späicher</string>
+  <string name="default_protocol">IP</string>
 </resources>
