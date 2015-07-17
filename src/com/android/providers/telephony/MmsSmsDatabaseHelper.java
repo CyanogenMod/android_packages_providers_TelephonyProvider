@@ -168,7 +168,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private static boolean sFakeLowStorageTest = false;     // for testing only
 
     static final String DATABASE_NAME = "mmssms.db";
-    static final int DATABASE_VERSION = 64;
+    static final int DATABASE_VERSION = 65;
     private final Context mContext;
     private LowStorageMonitor mLowStorageMonitor;
 
@@ -345,14 +345,14 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
 
         try {
             db.execSQL(
-            "  UPDATE threads" +
-            "  SET" +
-            "  date =" +
-            "    (SELECT date FROM" +
-            "        (SELECT date * 1000 AS date, thread_id FROM pdu" +
-            "         UNION SELECT date, thread_id FROM sms)" +
-            "     WHERE thread_id = " + thread_id + " ORDER BY date DESC LIMIT 1)" +
-            "  WHERE threads._id = " + thread_id + ";");
+                    "  UPDATE threads" +
+                            "  SET" +
+                            "  date =" +
+                            "    (SELECT date FROM" +
+                            "        (SELECT date * 1000 AS date, thread_id FROM pdu" +
+                            "         UNION SELECT date, thread_id FROM sms)" +
+                            "     WHERE thread_id = " + thread_id + " ORDER BY date DESC LIMIT 1)" +
+                            "  WHERE threads._id = " + thread_id + ";");
         } catch (Throwable ex) {
             Log.e(TAG, ex.getMessage(), ex);
         }
@@ -907,6 +907,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    Threads._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
                    Threads.DATE + " INTEGER DEFAULT 0," +
                    Threads.MESSAGE_COUNT + " INTEGER DEFAULT 0," +
+                   Threads.UNREAD_MESSAGE_COUNT + " INTEGER DEFAULT 0," +
                    Threads.RECIPIENT_IDS + " TEXT," +
                    Threads.SNIPPET + " TEXT," +
                    Threads.SNIPPET_CHARSET + " INTEGER DEFAULT 0," +
@@ -1400,6 +1401,22 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 db.endTransaction();
             }
             return;
+        case 64:
+            if (currentVersion <= 64) {
+                return;
+            }
+
+            db.beginTransaction();
+            try {
+                upgradeDatabaseToVersion65(db);
+                db.setTransactionSuccessful();
+            } catch (Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+                break;
+            } finally {
+                db.endTransaction();
+            }
+            return;
         }
 
         Log.e(TAG, "Destroying all old data.");
@@ -1695,6 +1712,15 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         db.execSQL("UPDATE " + MmsProvider.TABLE_PDU + " SET " + Mms.SUBSCRIPTION_ID + " = -1");
         db.execSQL("UPDATE " + SmsProvider.TABLE_SMS + " SET " + Sms.SUBSCRIPTION_ID + " = -1");
         db.execSQL("UPDATE " + SmsProvider.TABLE_RAW + " SET " + Sms.SUBSCRIPTION_ID + " = -1");
+    }
+
+    private void upgradeDatabaseToVersion65(SQLiteDatabase db) {
+        try {
+            db.execSQL("ALTER TABLE " + MmsSmsProvider.TABLE_THREADS + " ADD COLUMN "
+            + Threads.UNREAD_MESSAGE_COUNT + " INTEGER DEFAULT 0");
+        } catch (SQLiteException e) {
+            // consume since we have nothing to do
+        }
     }
 
     // Try to copy data from existing src column to new column which supposed
