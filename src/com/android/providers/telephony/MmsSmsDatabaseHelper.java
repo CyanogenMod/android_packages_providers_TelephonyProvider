@@ -23,6 +23,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.provider.BaseColumns;
 import android.provider.Telephony;
@@ -215,11 +216,13 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private static boolean sTriedAutoIncrement = false;
     private static boolean sFakeLowStorageTest = false;     // for testing only
 
+    private static final String NO_SUCH_COLUMN_EXCEPTION_MESSAGE = "no such column";
+    private static final String NO_SUCH_TABLE_EXCEPTION_MESSAGE = "no such table";
+
     static final String DATABASE_NAME = "mmssms.db";
     static final int DATABASE_VERSION = 61;
     private final Context mContext;
     private LowStorageMonitor mLowStorageMonitor;
-
 
     private MmsSmsDatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -451,6 +454,20 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         createMmsTriggers(db);
         createWordsTables(db);
         createIndices(db);
+    }
+
+    @Override
+    public void onOpen(SQLiteDatabase db) {
+        try {
+            // Try to access the table and create it if "no such table"
+            db.query(SmsProvider.TABLE_SMS, null, null, null, null, null, null);
+            checkAndUpdateSmsTable(db);
+        } catch (SQLiteException e) {
+            Log.e(TAG, "onOpen: ex. ", e);
+            if (e.getMessage().startsWith(NO_SUCH_TABLE_EXCEPTION_MESSAGE)) {
+                createSmsTables(db);
+            }
+        }
     }
 
     // When upgrading the database we need to populate the words
@@ -853,7 +870,8 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    "phone_id INTEGER DEFAULT -1, " +
                    "error_code INTEGER DEFAULT 0," +
                    "creator TEXT," +
-                   "seen INTEGER DEFAULT 0" +
+                   "seen INTEGER DEFAULT 0," +
+                   "priority INTEGER DEFAULT -1" +
                    ");");
 
         /**
@@ -1620,6 +1638,19 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         db.execSQL("ALTER TABLE " + SmsProvider.TABLE_RAW
                 +" ADD COLUMN " + Sms.PHONE_ID
                 + " INTEGER DEFAULT -1");
+    }
+
+    private void checkAndUpdateSmsTable(SQLiteDatabase db) {
+        try {
+            db.query(SmsProvider.TABLE_SMS, new String[] {"priority"}, null, null, null, null,
+                    null);
+        } catch (SQLiteException e) {
+            Log.e(TAG, "checkAndUpgradeSmsTable: ex. ", e);
+            if (e.getMessage().startsWith(NO_SUCH_COLUMN_EXCEPTION_MESSAGE)) {
+                db.execSQL("ALTER TABLE " + SmsProvider.TABLE_SMS + " ADD COLUMN "
+                        + "priority INTEGER DEFAULT -1");
+            }
+        }
     }
 
     @Override
