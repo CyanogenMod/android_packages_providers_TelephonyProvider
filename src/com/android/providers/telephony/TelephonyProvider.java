@@ -209,7 +209,7 @@ public class TelephonyProvider extends ContentProvider
                     + SubscriptionManager.MNC + " INTEGER DEFAULT 0" + ","
                     + SubscriptionManager.SUB_STATE + " INTEGER DEFAULT " + SubscriptionManager.ACTIVE + ","
                     + SubscriptionManager.NETWORK_MODE+ " INTEGER DEFAULT " + SubscriptionManager.DEFAULT_NW_MODE + ","
-                    + SubscriptionManager.USER_NETWORK_MODE+ " INTEGER DEFAULT " + RILConstants.PREFERRED_NETWORK_MODE
+                    + SubscriptionManager.USER_NETWORK_MODE+ " INTEGER DEFAULT " + SubscriptionManager.DEFAULT_NW_MODE
                     + ");");
             if (DBG) log("dbh.createSimInfoTable:-");
         }
@@ -494,7 +494,7 @@ public class TelephonyProvider extends ContentProvider
                     // Try to update the siminfo table. It might not be there.
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE
                             + " ADD COLUMN " + SubscriptionManager.USER_NETWORK_MODE
-                            + " INTEGER DEFAULT " + RILConstants.PREFERRED_NETWORK_MODE + ";");
+                            + " INTEGER DEFAULT " + SubscriptionManager.DEFAULT_NW_MODE + ";");
                 } catch (SQLiteException e) {
                     if (DBG) {
                         log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
