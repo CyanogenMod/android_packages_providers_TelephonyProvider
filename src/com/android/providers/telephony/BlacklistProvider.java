@@ -16,6 +16,8 @@
 
 package com.android.providers.telephony;
 
+import com.android.internal.telephony.util.BlacklistUtils;
+
 import android.app.backup.BackupManager;
 import android.content.ContentProvider;
 import android.content.ContentUris;
@@ -112,7 +114,8 @@ public class BlacklistProvider extends ContentProvider {
 
                         while (rows.moveToNext()) {
                             String originalNumber = rows.getString(1);
-                            String normalized = normalizeNumber(mContext, originalNumber).first;
+                            String normalized = BlacklistUtils.normalizeNumber(
+                                    mContext, originalNumber).first;
                             rowId[0] = rows.getString(0);
                             cv.clear();
                             cv.put(COLUMN_NORMALIZED, normalized);
@@ -160,7 +163,8 @@ public class BlacklistProvider extends ContentProvider {
                 qb.appendWhere(Blacklist._ID + " = " + uri.getLastPathSegment());
                 break;
             case BL_NUMBER: {
-                String number = normalizeNumber(getContext(), uri.getLastPathSegment()).first;
+                String number = BlacklistUtils.normalizeNumber(getContext(),
+                        uri.getLastPathSegment()).first;
                 boolean regex = uri.getBooleanQueryParameter(Blacklist.REGEX_KEY, false);
 
                 if (regex) {
@@ -267,7 +271,7 @@ public class BlacklistProvider extends ContentProvider {
                 }
                 where = COLUMN_NORMALIZED + " = ?";
                 whereArgs = new String[] {
-                    normalizeNumber(getContext(), uri.getLastPathSegment()).first
+                    BlacklistUtils.normalizeNumber(getContext(), uri.getLastPathSegment()).first
                 };
                 break;
             default:
@@ -313,7 +317,8 @@ public class BlacklistProvider extends ContentProvider {
                 db.beginTransaction();
                 try {
                     count = db.update(BLACKLIST_TABLE, values, COLUMN_NORMALIZED + " = ?",
-                            new String[] { normalizeNumber(getContext(), uriNumber).first });
+                            new String[] { BlacklistUtils.normalizeNumber(
+                                    getContext(), uriNumber).first });
                     if (count == 0) {
                         // convenience: fall back to insert if number wasn't present
                         if (db.insert(BLACKLIST_TABLE, null, values) > 0) {
@@ -365,19 +370,15 @@ public class BlacklistProvider extends ContentProvider {
                 return null;
             }
 
-            final Pair<String, Boolean> normalizeResult = normalizeNumber(getContext(), number);
-            final String normalizedNumber = normalizeResult.first;
-            boolean isRegex = normalizedNumber.indexOf('%') >= 0 ||
-                    normalizedNumber.indexOf('_') >= 0;
-            // For non-regex numbers, apply additional validity checking if
-            // they didn't pass e164 normalization
-            if (!isRegex && !normalizeResult.second && !isValidPhoneNumber(number)) {
-                // number was invalid
+            Pair<String, Boolean> normalizeResult = BlacklistUtils.isValidBlacklistInput(
+                    getContext(), number);
+            if (!normalizeResult.second) {
                 return null;
             }
 
+            final String normalizedNumber = normalizeResult.first;
             values.put(COLUMN_NORMALIZED, normalizedNumber);
-            values.put(Blacklist.IS_REGEX, isRegex ? 1 : 0);
+            values.put(Blacklist.IS_REGEX, BlacklistUtils.isInputRegex(normalizedNumber) ? 1 : 0);
         }
 
         return values;
@@ -386,61 +387,5 @@ public class BlacklistProvider extends ContentProvider {
     private void notifyChange() {
         getContext().getContentResolver().notifyChange(Blacklist.CONTENT_URI, null);
         mBackupManager.dataChanged();
-    }
-
-    /**
-     * Normalizes the passed in number and tries to format it according to E164.
-     * Returns a pair of
-     * - normalized number
-     * - boolean indicating whether the number is a E164 number or not
-     */
-    private static Pair<String, Boolean> normalizeNumber(Context context, String number) {
-        int len = number.length();
-        StringBuilder ret = new StringBuilder(len);
-
-        for (int i = 0; i < len; i++) {
-            char c = number.charAt(i);
-            // Character.digit() supports ASCII and Unicode digits (fullwidth, Arabic-Indic, etc.)
-            int digit = Character.digit(c, 10);
-            if (digit != -1) {
-                ret.append(digit);
-            } else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
-                String actualNumber = PhoneNumberUtils.convertKeypadLettersToDigits(number);
-                return normalizeNumber(context, actualNumber);
-            } else if (i == 0 && c == '+') {
-                ret.append(c);
-            } else if (c == '*') {
-                // replace regex match-multiple character by SQL equivalent
-                ret.append('%');
-            } else if (c == '.') {
-                // replace regex-match-single character by SQL equivalent
-                ret.append('_');
-            }
-        }
-
-        String normalizedNumber = ret.toString();
-        String e164Number = toE164Number(context, normalizedNumber);
-        return Pair.create(e164Number != null ? e164Number : normalizedNumber, e164Number != null);
-    }
-
-    private static String toE164Number(Context context, String src) {
-        // Try to retrieve the current ISO Country code
-        TelephonyManager tm = (TelephonyManager)
-                context.getSystemService(Context.TELEPHONY_SERVICE);
-        String countryCode = tm.getSimCountryIso();
-        Locale numberLocale = TextUtils.isEmpty(countryCode)
-                ? context.getResources().getConfiguration().locale
-                : new Locale("", countryCode);
-
-        return PhoneNumberUtils.formatNumberToE164(src, numberLocale.getCountry());
-    }
-
-    private static boolean isValidPhoneNumber(String address) {
-        for (int i = 0, count = address.length(); i < count; i++) {
-            if (!PhoneNumberUtils.isISODigit(address.charAt(i))) {
-                return false;
-            }
-        }
-        return true;
     }
 }
