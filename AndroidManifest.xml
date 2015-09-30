@@ -74,6 +74,7 @@
         <provider android:name="BlacklistProvider"
                   android:authorities="blacklist"
                   android:exported="true"
+                  android:singleUser="true"
                   android:multiprocess="true"
                   android:readPermission="android.permission.READ_PHONE_BLACKLIST"
                   android:writePermission="android.permission.CHANGE_PHONE_BLACKLIST" />
