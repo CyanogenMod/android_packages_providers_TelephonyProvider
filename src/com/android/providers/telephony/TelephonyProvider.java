@@ -66,7 +66,7 @@ public class TelephonyProvider extends ContentProvider
     private static final boolean DBG = true;
     private static final boolean VDBG = false; // STOPSHIP if true
 
-    private static final int DATABASE_VERSION = 16 << 16;
+    private static final int DATABASE_VERSION = 17 << 16;
     private static final int URL_UNKNOWN = 0;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
@@ -272,9 +272,9 @@ public class TelephonyProvider extends ContentProvider
                     // Uniqueness collisions are used to trigger merge code so if a field is listed
                     // here it means we will accept both (user edited + new apn_conf definition)
                     // Columns not included in UNIQUE constraint: name, current, edited,
-                    // user, server, password, authtype, type, protocol, roaming_protocol, sub_id,
+                    // user, server, password, authtype, type, sub_id,
                     // modem_cognitive, max_conns, wait_time, max_conns_time, mtu, bearer_bitmask
-                    "UNIQUE (numeric, mcc, mnc, apn, proxy, port, mmsproxy, mmsport, mmsc," +
+                    "UNIQUE (numeric, mcc, mnc, apn, proxy, port, mmsproxy, mmsport, mmsc, protocol, roaming_protocol," +
                     "carrier_enabled, bearer, mvno_type, mvno_match_data, profile_id));");
             if (DBG) log("dbh.createCarriersTable:-");
         }
