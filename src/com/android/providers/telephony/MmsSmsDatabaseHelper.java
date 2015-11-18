@@ -22,6 +22,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
@@ -477,6 +478,9 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
 
         // Improve the performance of deleting Mms.
         dropMmsTriggers(db);
+
+        // Upgrade SMS/MMS database
+        upgradeSmsMmsDb(db);
     }
 
     private void dropMmsTriggers(SQLiteDatabase db) {
@@ -1444,6 +1448,12 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         onCreate(db);
     }
 
+    @Override
+    public void onDowngrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        // Do Nothing
+        Log.i(TAG, "oldVersion: " + oldVersion + " newVersion: " + newVersion);
+    }
+
     private void dropAll(SQLiteDatabase db) {
         // Clean the database out in order to start over from scratch.
         // We don't need to drop our triggers here because SQLite automatically
@@ -1993,6 +2003,56 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
 
         // pdu-related triggers get tossed when the part table is dropped -- rebuild them.
         createMmsTriggers(db);
+    }
+
+    private boolean createSharedPrefForUpgrade() {
+        String FILENAME = "upgradeSmsMmsDb";
+        File prefFile = new File("/data/data/" + mContext.getPackageName()
+                + "/shared_prefs/" + FILENAME + ".xml");
+
+        if (!prefFile.exists()) {
+            Editor editor;
+            Log.d(TAG, "Shared Preference Created with name:  " + FILENAME);
+            SharedPreferences pref = mContext.getSharedPreferences(FILENAME,
+                    mContext.MODE_PRIVATE);
+            editor = pref.edit();
+            editor.putBoolean("isupgraded", true);
+            editor.commit();
+            return true;
+        } else {
+            Log.d(TAG, "Skipping upgrade/Upgrade already Done");
+            return false;
+        }
+    }
+
+    private void upgradeSmsMmsDb(SQLiteDatabase db) {
+        if (createSharedPrefForUpgrade()) {
+            db.beginTransaction();
+            try {
+                upgradeDatabaseSmsMms(db);
+                db.setTransactionSuccessful();
+            } catch (Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+            } finally {
+                db.endTransaction();
+            }
+        }
+    }
+
+    private void upgradeDatabaseSmsMms(SQLiteDatabase db) {
+        db.execSQL("CREATE VIEW IF NOT EXISTS " + SmsProvider.VIEW_SMS_RESTRICTED +
+                   " AS " + "SELECT * FROM " + SmsProvider.TABLE_SMS + " WHERE " +
+                   Sms.TYPE + "=" + Sms.MESSAGE_TYPE_INBOX +
+                   " OR " +
+                   Sms.TYPE + "=" + Sms.MESSAGE_TYPE_SENT + ";");
+        db.execSQL("CREATE VIEW IF NOT EXISTS " + MmsProvider.VIEW_PDU_RESTRICTED +
+                   "  AS " + "SELECT * FROM " + MmsProvider.TABLE_PDU + " WHERE " +
+                   "(" + Mms.MESSAGE_BOX + "=" + Mms.MESSAGE_BOX_INBOX +
+                   " OR " +
+                   Mms.MESSAGE_BOX + "=" + Mms.MESSAGE_BOX_SENT + ")" +
+                   " AND " +
+                   "(" + Mms.MESSAGE_TYPE + "!=" +
+                   PduHeaders.MESSAGE_TYPE_NOTIFICATION_IND + ");");
     }
 
     private class LowStorageMonitor extends BroadcastReceiver {
