@@ -67,7 +67,7 @@ public class TelephonyProvider extends ContentProvider
     private static final boolean DBG = true;
     private static final boolean VDBG = false; // STOPSHIP if true
 
-    private static final int DATABASE_VERSION = 18 << 16;
+    private static final int DATABASE_VERSION = 21 << 16;
     private static final int URL_UNKNOWN = 0;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
@@ -511,107 +511,7 @@ public class TelephonyProvider extends ContentProvider
                 }
                 oldVersion = 13 << 16 | 6;
             }
-            if (oldVersion < (14 << 16 | 6)) {
-                // Do nothing. This is to avoid recreating table twice. Table is anyway recreated
-                // for next version and that takes care of updates for this version as well.
-                // This version added a new column user_edited to carriers db.
-            }
-            if (oldVersion < (15 << 16 | 6)) {
-                // Most devices should be upgrading from version 13. On upgrade new db will be
-                // populated from the xml included in OTA but user and carrier edited/added entries
-                // need to be preserved. This new version also adds new columns EDITED and
-                // BEARER_BITMASK to the table. Upgrade steps from version 13 are:
-                // 1. preserve user and carrier added/edited APNs (by comparing against
-                // old-apns-conf.xml included in OTA) - done in preserveUserAndCarrierApns()
-                // 2. add new columns EDITED and BEARER_BITMASK (create a new table for that) - done
-                // in createCarriersTable()
-                // 3. copy over preserved APNs from old table to new table - done in
-                // copyPreservedApnsToNewTable()
-                // The only exception if upgrading from version 14 is that EDITED field is already
-                // present (but is called USER_EDITED)
-                Cursor c;
-                String[] proj = {"_id"};
-                if (VDBG) {
-                    c = db.query(CARRIERS_TABLE, proj, null, null, null, null, null);
-                    log("dbh.onUpgrade:- before upgrading total number of rows: " + c.getCount());
-                }
-
-                // Compare db with old apns xml file so that any user or carrier edited/added
-                // entries can be preserved across upgrade
-                preserveUserAndCarrierApns(db);
-
-                c = db.query(CARRIERS_TABLE, null, null, null, null, null, null);
-
-                if (VDBG) {
-                    log("dbh.onUpgrade:- after preserveUserAndCarrierApns() total number of " +
-                            "rows: " + ((c == null) ? 0 : c.getCount()));
-                }
-
-                createCarriersTable(db, CARRIERS_TABLE_TMP);
-
-                copyPreservedApnsToNewTable(db, c);
-                c.close();
-
-                db.execSQL("DROP TABLE IF EXISTS " + CARRIERS_TABLE);
-
-                db.execSQL("ALTER TABLE " + CARRIERS_TABLE_TMP + " rename to " + CARRIERS_TABLE +
-                        ";");
-
-                if (VDBG) {
-                    c = db.query(CARRIERS_TABLE, proj, null, null, null, null, null);
-                    log("dbh.onUpgrade:- after upgrading total number of rows: " + c.getCount());
-                    c.close();
-                    c = db.query(CARRIERS_TABLE, proj, "edited=" + Telephony.Carriers.UNEDITED,
-                            null, null, null, null);
-                    log("dbh.onUpgrade:- after upgrading total number of rows with edited="
-                            + Telephony.Carriers.UNEDITED + ": " + c.getCount());
-                    c.close();
-                    c = db.query(CARRIERS_TABLE, proj, "edited!=" + Telephony.Carriers.UNEDITED,
-                            null, null, null, null);
-                    log("dbh.onUpgrade:- after upgrading total number of rows with edited!="
-                            + Telephony.Carriers.UNEDITED + ": " + c.getCount());
-                    c.close();
-                }
-
-                oldVersion = 15 << 16 | 6;
-            }
-            if (oldVersion < (16 << 16 | 6)) {
-                try {
-                    // Try to update the siminfo table. It might not be there.
-                    // These columns may already be present in which case execSQL will throw an
-                    // exception
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + SubscriptionManager.CB_EXTREME_THREAT_ALERT + " INTEGER DEFAULT 1;");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + SubscriptionManager.CB_SEVERE_THREAT_ALERT + " INTEGER DEFAULT 1;");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + SubscriptionManager.CB_AMBER_ALERT + " INTEGER DEFAULT 1;");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + SubscriptionManager.CB_EMERGENCY_ALERT + " INTEGER DEFAULT 1;");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + SubscriptionManager.CB_ALERT_SOUND_DURATION + " INTEGER DEFAULT 4;");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + SubscriptionManager.CB_ALERT_REMINDER_INTERVAL + " INTEGER DEFAULT 0;");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + SubscriptionManager.CB_ALERT_VIBRATE + " INTEGER DEFAULT 1;");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + SubscriptionManager.CB_ALERT_SPEECH + " INTEGER DEFAULT 1;");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + SubscriptionManager.CB_ETWS_TEST_ALERT + " INTEGER DEFAULT 0;");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + SubscriptionManager.CB_CHANNEL_50_ALERT + " INTEGER DEFAULT 1;");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + SubscriptionManager.CB_CMAS_TEST_ALERT + " INTEGER DEFAULT 0;");
-                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + SubscriptionManager.CB_OPT_OUT_DIALOG + " INTEGER DEFAULT 1;");
-                } catch (SQLiteException e) {
-                    if (DBG) {
-                        log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
-                                " The table will get created in onOpen.");
-                    }
-                }
-                oldVersion = 16 << 16 | 6;
-            }
+            //CM Switched from Version13 to Version17/18
             if (oldVersion < (17 << 16 | 6)) {
                 try {
                         upgradeForProfileIdIfNecessary(db);
@@ -689,6 +589,100 @@ public class TelephonyProvider extends ContentProvider
                 }
                 oldVersion = 18 << 16 | 6;
             }
+            if (oldVersion < (21 << 16 | 6)) {
+                // Most devices should be upgrading from version 13. On upgrade new db will be
+                // populated from the xml included in OTA but user and carrier edited/added entries
+                // need to be preserved. This new version also adds new columns EDITED and
+                // BEARER_BITMASK to the table. Upgrade steps from version 13 are:
+                // 1. preserve user and carrier added/edited APNs (by comparing against
+                // old-apns-conf.xml included in OTA) - done in preserveUserAndCarrierApns()
+                // 2. add new columns EDITED and BEARER_BITMASK (create a new table for that) - done
+                // in createCarriersTable()
+                // 3. copy over preserved APNs from old table to new table - done in
+                // copyPreservedApnsToNewTable()
+                // The only exception if upgrading from version 14 is that EDITED field is already
+                // present (but is called USER_EDITED)
+                Cursor c;
+                String[] proj = {"_id"};
+                if (VDBG) {
+                    c = db.query(CARRIERS_TABLE, proj, null, null, null, null, null);
+                    log("dbh.onUpgrade:- before upgrading total number of rows: " + c.getCount());
+                }
+
+                // Compare db with old apns xml file so that any user or carrier edited/added
+                // entries can be preserved across upgrade
+                preserveUserAndCarrierApns(db);
+
+                c = db.query(CARRIERS_TABLE, null, null, null, null, null, null);
+
+                if (VDBG) {
+                    log("dbh.onUpgrade:- after preserveUserAndCarrierApns() total number of " +
+                            "rows: " + ((c == null) ? 0 : c.getCount()));
+                }
+
+                createCarriersTable(db, CARRIERS_TABLE_TMP);
+
+                copyPreservedApnsToNewTable(db, c);
+                c.close();
+
+                db.execSQL("DROP TABLE IF EXISTS " + CARRIERS_TABLE);
+
+                db.execSQL("ALTER TABLE " + CARRIERS_TABLE_TMP + " rename to " + CARRIERS_TABLE +
+                        ";");
+
+                if (VDBG) {
+                    c = db.query(CARRIERS_TABLE, proj, null, null, null, null, null);
+                    log("dbh.onUpgrade:- after upgrading total number of rows: " + c.getCount());
+                    c.close();
+                    c = db.query(CARRIERS_TABLE, proj, "edited=" + Telephony.Carriers.UNEDITED,
+                            null, null, null, null);
+                    log("dbh.onUpgrade:- after upgrading total number of rows with edited="
+                            + Telephony.Carriers.UNEDITED + ": " + c.getCount());
+                    c.close();
+                    c = db.query(CARRIERS_TABLE, proj, "edited!=" + Telephony.Carriers.UNEDITED,
+                            null, null, null, null);
+                    log("dbh.onUpgrade:- after upgrading total number of rows with edited!="
+                            + Telephony.Carriers.UNEDITED + ": " + c.getCount());
+                    c.close();
+                }
+
+                try {
+                    // Try to update the siminfo table. It might not be there.
+                    // These columns may already be present in which case execSQL will throw an
+                    // exception
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + SubscriptionManager.CB_EXTREME_THREAT_ALERT + " INTEGER DEFAULT 1;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + SubscriptionManager.CB_SEVERE_THREAT_ALERT + " INTEGER DEFAULT 1;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + SubscriptionManager.CB_AMBER_ALERT + " INTEGER DEFAULT 1;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + SubscriptionManager.CB_EMERGENCY_ALERT + " INTEGER DEFAULT 1;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + SubscriptionManager.CB_ALERT_SOUND_DURATION + " INTEGER DEFAULT 4;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + SubscriptionManager.CB_ALERT_REMINDER_INTERVAL + " INTEGER DEFAULT 0;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + SubscriptionManager.CB_ALERT_VIBRATE + " INTEGER DEFAULT 1;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + SubscriptionManager.CB_ALERT_SPEECH + " INTEGER DEFAULT 1;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + SubscriptionManager.CB_ETWS_TEST_ALERT + " INTEGER DEFAULT 0;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + SubscriptionManager.CB_CHANNEL_50_ALERT + " INTEGER DEFAULT 1;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + SubscriptionManager.CB_CMAS_TEST_ALERT + " INTEGER DEFAULT 0;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + SubscriptionManager.CB_OPT_OUT_DIALOG + " INTEGER DEFAULT 1;");
+                } catch (SQLiteException e) {
+                    if (DBG) {
+                        log("onUpgrade skipping " + SIMINFO_TABLE + " upgrade. " +
+                                " The table will get created in onOpen.");
+                    }
+                }
+                oldVersion = 21 << 16 | 6;
+            }
+
             if (DBG) {
                 log("dbh.onUpgrade:- db=" + db + " oldV=" + oldVersion + " newV=" + newVersion);
             }
