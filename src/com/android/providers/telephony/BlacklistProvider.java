@@ -16,27 +16,26 @@
 
 package com.android.providers.telephony;
 
-import com.android.internal.telephony.util.BlacklistUtils;
-
-import android.app.backup.BackupManager;
 import android.content.ContentProvider;
 import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.UriMatcher;
+import android.content.SharedPreferences;
+import android.database.MatrixCursor;
+import android.text.format.Time;
+import com.android.internal.telephony.util.BlacklistUtils;
+
+import android.app.backup.BackupManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
 import android.provider.Telephony.Blacklist;
-import android.telephony.PhoneNumberUtils;
-import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
-
-import java.util.Locale;
 
 public class BlacklistProvider extends ContentProvider {
     private static final String TAG = "BlacklistProvider";
@@ -53,6 +52,7 @@ public class BlacklistProvider extends ContentProvider {
     private static final int BL_NUMBER      = 2;
     private static final int BL_PHONE       = 3;
     private static final int BL_MESSAGE     = 4;
+
 
     private static final UriMatcher
             sURIMatcher = new UriMatcher(UriMatcher.NO_MATCH);
@@ -190,11 +190,11 @@ public class BlacklistProvider extends ContentProvider {
         }
 
         SQLiteDatabase db = mOpenHelper.getReadableDatabase();
-        Cursor ret = qb.query(db, projection, selection, selectionArgs, null, null, sortOrder);
+        Cursor cursor = qb.query(db, projection, selection, selectionArgs, null, null, sortOrder);
 
-        ret.setNotificationUri(getContext().getContentResolver(), uri);
+        cursor.setNotificationUri(getContext().getContentResolver(), uri);
 
-        return ret;
+        return cursor;
     }
 
     @Override
@@ -236,7 +236,7 @@ public class BlacklistProvider extends ContentProvider {
         }
 
         if (DEBUG) Log.d(TAG, "inserted " + values + " rowID = " + rowID);
-        notifyChange();
+        notifyChange(uri);
 
         return ContentUris.withAppendedId(Blacklist.CONTENT_URI, rowID);
     }
@@ -282,7 +282,7 @@ public class BlacklistProvider extends ContentProvider {
         if (DEBUG) Log.d(TAG, "delete result count " + count);
 
         if (count > 0) {
-            notifyChange();
+            notifyChange(uri);
         }
 
         return count;
@@ -345,7 +345,7 @@ public class BlacklistProvider extends ContentProvider {
         if (DEBUG) Log.d(TAG, "Update result count " + count);
 
         if (count > 0) {
-            notifyChange();
+            notifyChange(uri);
         }
 
         return count;
@@ -385,7 +385,15 @@ public class BlacklistProvider extends ContentProvider {
     }
 
     private void notifyChange() {
-        getContext().getContentResolver().notifyChange(Blacklist.CONTENT_URI, null);
+        notifyChange(null);
+    }
+
+    private void notifyChange(Uri changeUri) {
+        if (changeUri == null) {
+            getContext().getContentResolver().notifyChange(Blacklist.CONTENT_URI, null);
+        } else {
+            getContext().getContentResolver().notifyChange(changeUri, null);
+        }
         mBackupManager.dataChanged();
     }
 }
