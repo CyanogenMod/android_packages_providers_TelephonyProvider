@@ -16,14 +16,12 @@
 
 package com.android.providers.telephony;
 
+import android.content.*;
+import android.database.MatrixCursor;
+import android.text.format.Time;
 import com.android.internal.telephony.util.BlacklistUtils;
 
 import android.app.backup.BackupManager;
-import android.content.ContentProvider;
-import android.content.ContentUris;
-import android.content.ContentValues;
-import android.content.Context;
-import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
@@ -40,6 +38,9 @@ import java.util.Locale;
 
 public class BlacklistProvider extends ContentProvider {
     private static final String TAG = "BlacklistProvider";
+    private static final String BLACKLIST_TIMESTAMP_FILE =
+            "telephony_blacklist_timestamp_file";
+    private static final String BLACKLIST_TIMESTAMP = "blacklist_timestamp";
     private static final boolean DEBUG = true;
 
     private static final String DATABASE_NAME = "blacklist.db";
@@ -53,6 +54,9 @@ public class BlacklistProvider extends ContentProvider {
     private static final int BL_NUMBER      = 2;
     private static final int BL_PHONE       = 3;
     private static final int BL_MESSAGE     = 4;
+    private static final int BL_TIMESTAMP   = 5;
+
+    private SharedPreferences mSharedPrefs;
 
     private static final UriMatcher
             sURIMatcher = new UriMatcher(UriMatcher.NO_MATCH);
@@ -63,6 +67,7 @@ public class BlacklistProvider extends ContentProvider {
         sURIMatcher.addURI("blacklist", "bynumber/*", BL_NUMBER);
         sURIMatcher.addURI("blacklist", "phone",      BL_PHONE);
         sURIMatcher.addURI("blacklist", "message",    BL_MESSAGE);
+        sURIMatcher.addURI("blacklist", "timestamp",  BL_TIMESTAMP);
     }
 
     private static class DatabaseHelper extends SQLiteOpenHelper {
@@ -140,8 +145,31 @@ public class BlacklistProvider extends ContentProvider {
     public boolean onCreate() {
         mOpenHelper = new DatabaseHelper(getContext());
         mBackupManager = new BackupManager(getContext());
+        mSharedPrefs = getContext()
+                .getSharedPreferences(BLACKLIST_TIMESTAMP_FILE, Context.MODE_PRIVATE);
         return true;
     }
+
+    private long updateTimestamp() {
+        Log.v(TAG, "updateTimestamp");
+        SharedPreferences.Editor editor = mSharedPrefs.edit();
+        Time time = new Time();
+        time.setToNow();
+        long now = time.toMillis(true);
+        editor.putLong(BLACKLIST_TIMESTAMP, now);
+        editor.commit();
+        return now;
+    }
+
+    private long getTimestamp() {
+        long timestamp = mSharedPrefs.getLong(BLACKLIST_TIMESTAMP, 0);
+        Log.v(TAG, "getTimestamp: " + timestamp);
+        if (timestamp == 0) {
+            timestamp = updateTimestamp();
+        }
+        return timestamp;
+    }
+
 
     @Override
     public Cursor query(Uri uri, String[] projection, String selection,
@@ -157,6 +185,8 @@ public class BlacklistProvider extends ContentProvider {
         }
 
         switch (match) {
+            case BL_TIMESTAMP:
+                break;
             case BL_ALL:
                 break;
             case BL_ID:
@@ -185,16 +215,28 @@ public class BlacklistProvider extends ContentProvider {
                 return null;
         }
 
-        if (TextUtils.isEmpty(sortOrder)) {
-            sortOrder = Blacklist.DEFAULT_SORT_ORDER;
+        Cursor cursor;
+        MatrixCursor tsCursor;
+        if (match == BL_TIMESTAMP) {
+            String [] cols = new String [1];
+            Long [] timestamp = new Long [1];
+            cols[0] = "timestamp";
+            timestamp[0] = getTimestamp();
+            tsCursor = new MatrixCursor(cols, 1);
+            tsCursor.addRow(timestamp);
+            cursor = tsCursor;
+        } else {
+            if (TextUtils.isEmpty(sortOrder)) {
+                sortOrder = Blacklist.DEFAULT_SORT_ORDER;
+            }
+
+            SQLiteDatabase db = mOpenHelper.getReadableDatabase();
+            cursor = qb.query(db, projection, selection, selectionArgs, null, null, sortOrder);
         }
 
-        SQLiteDatabase db = mOpenHelper.getReadableDatabase();
-        Cursor ret = qb.query(db, projection, selection, selectionArgs, null, null, sortOrder);
+        cursor.setNotificationUri(getContext().getContentResolver(), uri);
 
-        ret.setNotificationUri(getContext().getContentResolver(), uri);
-
-        return ret;
+        return cursor;
     }
 
     @Override
@@ -207,6 +249,9 @@ public class BlacklistProvider extends ContentProvider {
             case BL_ID:
             case BL_NUMBER:
                 return "vnd.android.cursor.item/blacklist-entry";
+            case BL_TIMESTAMP:
+                // TODO - figure out the exact string to return
+                return "vnd://timestamp";
             default:
                 throw new IllegalArgumentException("Unknown URI " + uri);
         }
@@ -236,7 +281,8 @@ public class BlacklistProvider extends ContentProvider {
         }
 
         if (DEBUG) Log.d(TAG, "inserted " + values + " rowID = " + rowID);
-        notifyChange();
+        notifyChange(uri);
+        updateTimestamp();
 
         return ContentUris.withAppendedId(Blacklist.CONTENT_URI, rowID);
     }
@@ -282,7 +328,8 @@ public class BlacklistProvider extends ContentProvider {
         if (DEBUG) Log.d(TAG, "delete result count " + count);
 
         if (count > 0) {
-            notifyChange();
+            notifyChange(uri);
+            updateTimestamp();
         }
 
         return count;
@@ -345,7 +392,8 @@ public class BlacklistProvider extends ContentProvider {
         if (DEBUG) Log.d(TAG, "Update result count " + count);
 
         if (count > 0) {
-            notifyChange();
+            notifyChange(uri);
+            updateTimestamp();
         }
 
         return count;
@@ -385,7 +433,15 @@ public class BlacklistProvider extends ContentProvider {
     }
 
     private void notifyChange() {
-        getContext().getContentResolver().notifyChange(Blacklist.CONTENT_URI, null);
+        notifyChange(null);
+    }
+
+    private void notifyChange(Uri changeUri) {
+        if (changeUri == null) {
+            getContext().getContentResolver().notifyChange(Blacklist.CONTENT_URI, null);
+        } else {
+            getContext().getContentResolver().notifyChange(changeUri, null);
+        }
         mBackupManager.dataChanged();
     }
 }
