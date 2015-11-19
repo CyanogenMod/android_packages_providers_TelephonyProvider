@@ -236,7 +236,7 @@ public class BlacklistProvider extends ContentProvider {
         }
 
         if (DEBUG) Log.d(TAG, "inserted " + values + " rowID = " + rowID);
-        notifyChange();
+        notifyChange(uri);
 
         return ContentUris.withAppendedId(Blacklist.CONTENT_URI, rowID);
     }
@@ -282,7 +282,7 @@ public class BlacklistProvider extends ContentProvider {
         if (DEBUG) Log.d(TAG, "delete result count " + count);
 
         if (count > 0) {
-            notifyChange();
+            notifyChange(uri);
         }
 
         return count;
@@ -345,7 +345,7 @@ public class BlacklistProvider extends ContentProvider {
         if (DEBUG) Log.d(TAG, "Update result count " + count);
 
         if (count > 0) {
-            notifyChange();
+            notifyChange(uri);
         }
 
         return count;
@@ -385,7 +385,15 @@ public class BlacklistProvider extends ContentProvider {
     }
 
     private void notifyChange() {
-        getContext().getContentResolver().notifyChange(Blacklist.CONTENT_URI, null);
+        notifyChange(null);
+    }
+
+    private void notifyChange(Uri changeUri) {
+        if (changeUri == null) {
+            getContext().getContentResolver().notifyChange(Blacklist.CONTENT_URI, null);
+        } else {
+            getContext().getContentResolver().notifyChange(changeUri, null);
+        }
         mBackupManager.dataChanged();
     }
 }
