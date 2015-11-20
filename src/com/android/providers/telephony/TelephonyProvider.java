@@ -603,6 +603,8 @@ public class TelephonyProvider extends ContentProvider
                 }
                 oldVersion = 18 << 16 | 6;
             }
+            //CM Switched from Version13 to Version17/18, comments below reflect AOSP. In case
+            //of CM we will be upgrading from version 18, but the logic applies.
             if (oldVersion < (21 << 16 | 6)) {
                 // Most devices should be upgrading from version 13. On upgrade new db will be
                 // populated from the xml included in OTA but user and carrier edited/added entries
@@ -897,6 +899,9 @@ public class TelephonyProvider extends ContentProvider
                     getStringValueFromCursor(cv, c, Telephony.Carriers.ROAMING_PROTOCOL);
                     getStringValueFromCursor(cv, c, Telephony.Carriers.MVNO_TYPE);
                     getStringValueFromCursor(cv, c, Telephony.Carriers.MVNO_MATCH_DATA);
+                    getStringValueFromCursor(cv, c, Telephony.Carriers.PPP_NUMBER);
+                    getStringValueFromCursor(cv, c, Telephony.Carriers.LOCALIZED_NAME);
+                    getStringValueFromCursor(cv, c, Telephony.Carriers.VISIT_AREA);
 
                     // bool/int vals
                     getIntValueFromCursor(cv, c, Telephony.Carriers.AUTH_TYPE);
@@ -910,6 +915,7 @@ public class TelephonyProvider extends ContentProvider
                     getIntValueFromCursor(cv, c, Telephony.Carriers.WAIT_TIME);
                     getIntValueFromCursor(cv, c, Telephony.Carriers.MAX_CONNS_TIME);
                     getIntValueFromCursor(cv, c, Telephony.Carriers.MTU);
+                    getIntValueFromCursor(cv, c, Telephony.Carriers.READ_ONLY);
 
                     // Change bearer to a bitmask
                     String bearerStr = c.getString(c.getColumnIndex(Telephony.Carriers.BEARER));
