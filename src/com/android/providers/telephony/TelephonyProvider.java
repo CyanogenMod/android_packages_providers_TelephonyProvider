@@ -965,13 +965,23 @@ public class TelephonyProvider extends ContentProvider
                     getIntValueFromCursor(cv, c, Telephony.Carriers.CURRENT);
                     getIntValueFromCursor(cv, c, Telephony.Carriers.CARRIER_ENABLED);
                     getIntValueFromCursor(cv, c, Telephony.Carriers.BEARER);
-                    getIntValueFromCursor(cv, c, Telephony.Carriers.SUBSCRIPTION_ID);
-                    getIntValueFromCursor(cv, c, Telephony.Carriers.PROFILE_ID);
-                    getIntValueFromCursor(cv, c, Telephony.Carriers.MODEM_COGNITIVE);
-                    getIntValueFromCursor(cv, c, Telephony.Carriers.MAX_CONNS);
-                    getIntValueFromCursor(cv, c, Telephony.Carriers.WAIT_TIME);
-                    getIntValueFromCursor(cv, c, Telephony.Carriers.MAX_CONNS_TIME);
-                    getIntValueFromCursor(cv, c, Telephony.Carriers.MTU);
+                    try {
+                        getIntValueFromCursor(cv, c, Telephony.Carriers.SUBSCRIPTION_ID);
+                        getIntValueFromCursor(cv, c, Telephony.Carriers.PROFILE_ID);
+                        getIntValueFromCursor(cv, c, Telephony.Carriers.MODEM_COGNITIVE);
+                        getIntValueFromCursor(cv, c, Telephony.Carriers.MAX_CONNS);
+                        getIntValueFromCursor(cv, c, Telephony.Carriers.WAIT_TIME);
+                        getIntValueFromCursor(cv, c, Telephony.Carriers.MAX_CONNS_TIME);
+                        getIntValueFromCursor(cv, c, Telephony.Carriers.MTU);
+                    } catch (IllegalStateException e) {
+                        cv.put(Telephony.Carriers.SUBSCRIPTION_ID, -1);
+                        cv.put(Telephony.Carriers.PROFILE_ID, 0);
+                        cv.put(Telephony.Carriers.MODEM_COGNITIVE, 0);
+                        cv.put(Telephony.Carriers.MAX_CONNS, 0);
+                        cv.put(Telephony.Carriers.WAIT_TIME, 0);
+                        cv.put(Telephony.Carriers.MAX_CONNS_TIME, 0);
+                        cv.put(Telephony.Carriers.MTU, 0);
+                    }
                     getIntValueFromCursor(cv, c, Telephony.Carriers.READ_ONLY);
 
                     // Change bearer to a bitmask
