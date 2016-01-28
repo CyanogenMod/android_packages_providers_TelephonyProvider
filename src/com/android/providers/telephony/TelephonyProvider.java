@@ -103,6 +103,7 @@ public class TelephonyProvider extends ContentProvider
     private static final String OEM_APNS_PATH = "telephony/apns-conf.xml";
     private static final String OTA_UPDATED_APNS_PATH = "misc/apns-conf.xml";
     private static final String OLD_APNS_PATH = "etc/old-apns-conf.xml";
+    private static final String REGIONAL_APNS_PATH = "etc/regional-apns-conf.xml";
 
     private static final String READ_ONLY = "read_only";
     private static final String LOCALIZED_NAME = "localized_name";
@@ -261,7 +262,8 @@ public class TelephonyProvider extends ContentProvider
                     + SubscriptionManager.CB_ALERT_SPEECH + " INTEGER DEFAULT 1,"
                     + SubscriptionManager.CB_ETWS_TEST_ALERT + " INTEGER DEFAULT 0,"
                     + SubscriptionManager.CB_CHANNEL_50_ALERT + " INTEGER DEFAULT 1,"
-                    + SubscriptionManager.CB_CMAS_TEST_ALERT + " INTEGER DEFAULT 0,"
+                    + SubscriptionManager.CB_CHANNEL_60_ALERT + " INTEGER DEFAULT 1,"
+                    + SubscriptionManager.CB_CMAS_TEST_ALERT + " INTEGER DEFAULT 1,"
                     + SubscriptionManager.CB_OPT_OUT_DIALOG + " INTEGER DEFAULT 1"
                     + ");");
             if (DBG) log("dbh.createSimInfoTable:-");
@@ -310,12 +312,12 @@ public class TelephonyProvider extends ContentProvider
                     "visit_area TEXT DEFAULT ''," +
                     // Uniqueness collisions are used to trigger merge code so if a field is listed
                     // here it means we will accept both (user edited + new apn_conf definition)
-                    // Columns not included in UNIQUE constraint: name, current, edited,
-                    // user, server, password, authtype, type, sub_id,
+                    // Columns not included in UNIQUE constraint: current, edited,
+                    // user, server, password, authtype, sub_id,
                     // modem_cognitive, max_conns, wait_time, max_conns_time, mtu, bearer_bitmask
                     // Change UNIQUE_KEY_SIZE if the UNIQUE set is changed
-                    "UNIQUE (numeric, mcc, mnc, apn, proxy, port, mmsproxy, mmsport, mmsc, protocol, roaming_protocol," +
-                    "carrier_enabled, bearer, mvno_type, mvno_match_data, profile_id));");
+                    "UNIQUE (name, numeric, mcc, mnc, apn, proxy, port, mmsproxy, mmsport, mmsc, protocol, roaming_protocol," +
+                    "type, carrier_enabled, bearer, mvno_type, mvno_match_data, profile_id));");
             if (DBG) log("dbh.createCarriersTable:-");
         }
 
@@ -370,20 +372,41 @@ public class TelephonyProvider extends ContentProvider
             FileReader confreader = null;
             if (DBG) log("confFile = " + confFile);
             try {
+                // Read external APNS data (partner-provided)
                 confreader = new FileReader(confFile);
-                confparser = Xml.newPullParser();
-                confparser.setInput(confreader);
-                XmlUtils.beginDocument(confparser, "apns");
+                confparser = getXmlParser(confreader);
 
-                // Sanity check. Force internal version and confidential versions to agree
-                int confversion = Integer.parseInt(confparser.getAttributeValue(null, "version"));
-                if (publicversion != confversion) {
-                    log("initDatabase: throwing exception due to version mismatch");
-                    throw new IllegalStateException("Internal APNS file version doesn't match "
-                            + confFile.getAbsolutePath());
+                if (confparser != null) {
+                    // Sanity check. Force internal version and confidential versions to agree
+                    int confversion = Integer.parseInt(confparser.
+                            getAttributeValue(null, "version"));
+                    if (publicversion != confversion) {
+                        log("initDatabase: throwing exception due to version mismatch");
+                        throw new IllegalStateException("Internal APNS file version doesn't match "
+                                + confFile.getAbsolutePath());
+                    }
+
+                    loadApns(db, confparser);
+
+                    try {
+                        if (confreader != null) {
+                            confreader.close();
+                            confreader = null;
+                        }
+                        confparser = null;
+                    } catch (IOException e) { }
                 }
 
-                loadApns(db, confparser);
+                confFile = new File(Environment.getRootDirectory(), REGIONAL_APNS_PATH);
+                if (confFile.exists()) {
+                    confreader = new FileReader(confFile);
+                    confparser = getXmlParser(confreader);
+                    if (confparser != null) {
+                        loadRegionalApns(db, confparser);
+                    }
+                } else {
+                    if (DBG) log("Regional apns file not found");
+                }
             } catch (FileNotFoundException e) {
                 // It's ok if the file isn't found. It means there isn't a confidential file
                 // Log.e(TAG, "File not found: '" + confFile.getAbsolutePath() + "'");
@@ -422,8 +445,22 @@ public class TelephonyProvider extends ContentProvider
                     }
                 }
             }
-            if (VDBG) log("dbh.initDatabase:- db=" + db);
 
+            if (VDBG) log("dbh.initDatabase:- db=" + db);
+        }
+
+        private XmlPullParser getXmlParser(FileReader confreader) {
+            XmlPullParser confparser = null;
+            try {
+                confparser = Xml.newPullParser();
+                confparser.setInput(confreader);
+                XmlUtils.beginDocument(confparser, "apns");
+
+            } catch (Exception e) {
+                loge("Exception while parsing apns xml file" + e);
+            }
+
+            return confparser;
         }
 
         private File getNewerFile(File sysApnFile, File altApnFile) {
@@ -722,7 +759,9 @@ public class TelephonyProvider extends ContentProvider
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
                             + SubscriptionManager.CB_CHANNEL_50_ALERT + " INTEGER DEFAULT 1;");
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
-                            + SubscriptionManager.CB_CMAS_TEST_ALERT + " INTEGER DEFAULT 0;");
+                            + SubscriptionManager.CB_CHANNEL_60_ALERT + " INTEGER DEFAULT 1;");
+                    db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
+                            + SubscriptionManager.CB_CMAS_TEST_ALERT + " INTEGER DEFAULT 1;");
                     db.execSQL("ALTER TABLE " + SIMINFO_TABLE + " ADD COLUMN "
                             + SubscriptionManager.CB_OPT_OUT_DIALOG + " INTEGER DEFAULT 1;");
                 } catch (SQLiteException e) {
@@ -1244,6 +1283,132 @@ public class TelephonyProvider extends ContentProvider
                     db.endTransaction();
                 }
             }
+        }
+
+        /*
+         * Read apns from regional xml file one by one and update them to database
+         * - Replace apn if a match is found from telephony database,
+         * - Add apn if there is no match found from database
+         * @param db the sqlite database to write to
+         * @param parser the xml parser
+         *
+         */
+        private void loadRegionalApns(SQLiteDatabase db, XmlPullParser parser) {
+            if (DBG) log("Reading regional apns file");
+
+            try {
+                String[] apnParams = {Telephony.Carriers.NUMERIC,
+                        Telephony.Carriers.APN,
+                        Telephony.Carriers.NAME,
+                        Telephony.Carriers.TYPE};
+
+                db.beginTransaction();
+                XmlUtils.nextElement(parser);
+                while (parser.getEventType() != XmlPullParser.END_DOCUMENT) {
+                    boolean apnModified = false;
+                    ContentValues row = getRow(parser);
+                    if (row == null) {
+                        throw new XmlPullParserException("Expected 'apn' tag", parser, null);
+                    }
+                    row = setDefaultValue(row);
+
+                    String apnOperation = parser.getAttributeValue(null, "operation");
+                    if (DBG) log("loadRegionalApns: operation on apn: " + apnOperation);
+
+                    /* Construct sqlite query with numeric and apn of xml entry and
+                     * run it on telephony db.
+                     * If a unique match is found, replace it with the apn from xml file.
+                     * Else if multiple apn entries are found with this query,
+                     * re-execute query by adding name, type parameters as well.
+                     * If multiple apn entries are still found with all of these fields, just
+                     * add apn to db.
+                     */
+                    String selection = apnParams[0] + "=" + row.getAsString(apnParams[0]);
+                    for (int i = 0; i < apnParams.length-1; i++) {
+                        selection += " AND " + apnParams[i+1] + "=?";
+                        if (DBG) log("loadRegionalApns: selection: " + selection);
+
+                        //Create a selectionArgs array with values to be passed to sqlite query
+                        String selectionArgs[] = new String[i+1];
+                        for (int j = 0; j <= i; j++) {
+                            selectionArgs[j] = (row.getAsString(apnParams[j+1])).trim();
+                            if (DBG) log("loadRegionalApns: selectionArgs: " + selectionArgs[j]);
+                        }
+
+                        int result = formatApnsInDB(db, row, selection, selectionArgs,
+                                apnOperation);
+                        if (result <= 1) {
+                            apnModified = true;
+                            break;
+                        }
+                     }
+
+                     if (!apnModified && (apnOperation != null &&
+                             !apnOperation.equalsIgnoreCase("delete"))) {
+                         if (DBG) log("loadRegionalApns: Multiple apns found" +
+                                 " in Telephony Database." +
+                                 " Adding regional apn as a new entry");
+                         db.insertWithOnConflict(CARRIERS_TABLE, null, row,
+                                 SQLiteDatabase.CONFLICT_ABORT);
+                     }
+                     XmlUtils.nextElement(parser);
+                }
+                db.setTransactionSuccessful();
+            } catch (XmlPullParserException e) {
+                loge("Got XmlPullParserException while loading apns." + e);
+            } catch (IOException e) {
+                loge("Got IOException while loading apns." + e);
+            } catch (SQLException e) {
+                loge("Got SQLException while loading apns." + e);
+            } finally {
+                db.endTransaction();
+            }
+        }
+
+        private int formatApnsInDB(SQLiteDatabase db, ContentValues row,
+                String selection, String[] selectionArgs, String operation) {
+            int apnCount = 0;
+            String apn = selectionArgs[0];
+
+            try {
+                Cursor cursor = db.query(CARRIERS_TABLE, null, selection,
+                        selectionArgs, null, null, null);
+                if (cursor != null) {
+                    apnCount = cursor.getCount();
+                    if (VDBG) log("apn count: " + apnCount);
+                    if (apnCount > 1) {
+                        if (DBG) log("Multiple apns found in db with same values");
+                    } else if (apnCount == 1) {
+                        if (operation != null) {
+                            if (operation.equalsIgnoreCase("delete")) {
+                                if (DBG) log("Deleting apn in db: " + apn);
+                                db.delete(CARRIERS_TABLE, selection, selectionArgs);
+                            } else if (operation.equalsIgnoreCase("add")) {
+                                if (DBG) log("Adding regional apn to db: " + apn);
+                                db.insertWithOnConflict(CARRIERS_TABLE, null, row,
+                                        SQLiteDatabase.CONFLICT_REPLACE);
+                            }
+                        } else {
+                            if (DBG) log("Replacing apn in db with regional apn: " + apn);
+                            db.delete(CARRIERS_TABLE, selection, selectionArgs);
+                            db.insertWithOnConflict(CARRIERS_TABLE, null, row,
+                                    SQLiteDatabase.CONFLICT_ABORT);
+                        }
+                    } else {
+                        if (!(operation != null &&
+                                operation.equalsIgnoreCase("delete"))) {
+                            if (DBG) log("Adding regional apn to db: " + apn);
+                            db.insertWithOnConflict(CARRIERS_TABLE, null, row,
+                                    SQLiteDatabase.CONFLICT_REPLACE);
+                        }
+                    }
+                    cursor.close();
+                }
+            } catch (SQLException e) {
+                loge("Got SQLException while loading apns." + e);
+            }
+
+            return apnCount;
         }
 
         static public ContentValues setDefaultValue(ContentValues values) {
@@ -1773,7 +1938,8 @@ public class TelephonyProvider extends ContentProvider
                     return null;
                 }
                 if (DBG) log("subIdString = " + subIdString + " subId = " + subId);
-                qb.appendWhere("numeric = '" + mTelephonyManager.getSimOperator(subId)+"'");
+                qb.appendWhere("numeric = '" +
+                        mTelephonyManager.getIccOperatorNumericForData(subId)+"'");
                 // FIXME alter the selection to pass subId
                 // selection = selection + "and subId = "
             }
