@@ -2429,9 +2429,26 @@ public class TelephonyProvider extends ContentProvider
 
     private void restoreDefaultAPN(int subId) {
         SQLiteDatabase db = mOpenHelper.getWritableDatabase();
+        TelephonyManager mTm =
+               (TelephonyManager) getContext().getSystemService(Context.TELEPHONY_SERVICE);
+        SubscriptionManager sm = SubscriptionManager.from(getContext());
+        String operatorNumeric = null;
+        String where = null;
+        List<SubscriptionInfo> subInfoList = sm.getActiveSubscriptionInfoList();
+        if (subInfoList != null && subInfoList.size() > 1) {
+            where = "not (";
+            for (SubscriptionInfo subInfo : subInfoList) {
+               if (subId != subInfo.getSubscriptionId()) {
+                  operatorNumeric = mTm.getIccOperatorNumericForData(subInfo.getSubscriptionId());
+                  where = where + "numeric=" + operatorNumeric + " and ";
+               }
+            }
+            where = where + "edited=" + Telephony.Carriers.USER_EDITED + ")";
+        }
+        log("restoreDefaultAPN: where: " + where);
 
         try {
-            db.delete(CARRIERS_TABLE, null, null);
+            db.delete(CARRIERS_TABLE, where, null);
         } catch (SQLException e) {
             loge("got exception when deleting to restore: " + e);
         }
