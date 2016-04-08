@@ -500,6 +500,16 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 createSmsTables(db);
             }
         }
+        try {
+            // Try to access the table and create it if "no such table"
+            db.query(MmsSmsProvider.TABLE_THREADS, null, null, null, null, null, null);
+            checkAndUpdateThreadsTable(db);
+        } catch (SQLiteException e) {
+            Log.e(TAG, "onOpen: ex. ", e);
+            if (e.getMessage().startsWith(NO_SUCH_TABLE_EXCEPTION_MESSAGE)) {
+                createCommonTables(db);
+            }
+        }
 
         // Improve the performance of deleting Mms.
         dropMmsTriggers(db);
@@ -979,7 +989,9 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                    Threads.ARCHIVED + " INTEGER DEFAULT 0," +
                    Threads.TYPE + " INTEGER DEFAULT 0," +
                    Threads.ERROR + " INTEGER DEFAULT 0," +
-                   Threads.HAS_ATTACHMENT + " INTEGER DEFAULT 0);");
+                   Threads.HAS_ATTACHMENT + " INTEGER DEFAULT 0," +
+                   Threads.ATTACHMENT_INFO + " TEXT," +
+                   Threads.NOTIFICATION + " INTEGER DEFAULT 0);");
 
         /**
          * This table stores the queue of messages to be sent/downloaded.
@@ -1757,6 +1769,30 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
+    private void checkAndUpdateThreadsTable(SQLiteDatabase db) {
+        try {
+            db.query(MmsSmsProvider.TABLE_THREADS, new String[] {Threads.ATTACHMENT_INFO},
+                    null, null, null, null, null);
+        } catch (SQLiteException e) {
+            Log.e(TAG, "checkAndUpdateThreadsTable: ex. ", e);
+            if (e.getMessage().startsWith(NO_SUCH_COLUMN_EXCEPTION_MESSAGE)) {
+                db.execSQL("ALTER TABLE " + MmsSmsProvider.TABLE_THREADS + " ADD COLUMN "
+                        + Threads.ATTACHMENT_INFO + " TEXT");
+            }
+        }
+
+        try {
+            db.query(MmsSmsProvider.TABLE_THREADS, new String[] {Threads.NOTIFICATION},
+                    null, null, null, null, null);
+        } catch (SQLiteException e) {
+            Log.e(TAG, "checkAndUpdateThreadsTable: ex. ", e);
+            if (e.getMessage().startsWith(NO_SUCH_COLUMN_EXCEPTION_MESSAGE)) {
+                db.execSQL("ALTER TABLE " + MmsSmsProvider.TABLE_THREADS + " ADD COLUMN "
+                        + Threads.NOTIFICATION + " INTEGER DEFAULT 0");
+            }
+        }
+    }
+
     @Override
     public synchronized SQLiteDatabase getWritableDatabase() {
         SQLiteDatabase db = super.getWritableDatabase();
@@ -1921,7 +1957,9 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 Threads.READ + " INTEGER DEFAULT 1," +
                 Threads.TYPE + " INTEGER DEFAULT 0," +
                 Threads.ERROR + " INTEGER DEFAULT 0," +
-                Threads.HAS_ATTACHMENT + " INTEGER DEFAULT 0);");
+                Threads.HAS_ATTACHMENT + " INTEGER DEFAULT 0," +
+                Threads.ATTACHMENT_INFO + " TEXT," +
+                Threads.NOTIFICATION + " INTEGER DEFAULT 0);");
 
         db.execSQL("INSERT INTO threads_temp SELECT * from threads;");
         db.execSQL("DROP TABLE threads;");

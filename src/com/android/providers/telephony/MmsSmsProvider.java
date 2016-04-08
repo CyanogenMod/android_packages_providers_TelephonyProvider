@@ -1306,8 +1306,14 @@ public class MmsSmsProvider extends ContentProvider {
         switch(URI_MATCHER.match(uri)) {
             case URI_CONVERSATIONS_MESSAGES:
                 String threadIdString = uri.getPathSegments().get(1);
-                affectedRows = updateConversation(threadIdString, values,
-                        selection, selectionArgs, callerUid, callerPkg);
+                if (values.containsKey(Threads.NOTIFICATION) ||
+                        values.containsKey(Threads.ATTACHMENT_INFO)) {
+                    String finalSelection = concatSelections(selection, "_id=" + threadIdString);
+                    affectedRows = db.update(TABLE_THREADS, values, finalSelection, null);
+                } else {
+                    affectedRows = updateConversation(threadIdString, values,
+                            selection, selectionArgs, callerUid, callerPkg);
+                }
                 break;
 
             case URI_PENDING_MSG:
