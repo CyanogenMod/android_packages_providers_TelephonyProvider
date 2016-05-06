@@ -100,6 +100,7 @@ public class MmsSmsProvider extends ContentProvider {
     private static final int URI_FIRST_LOCKED_MESSAGE_BY_THREAD_ID = 17;
     private static final int URI_MESSAGE_ID_TO_THREAD              = 18;
     private static final int URI_MESSAGES_COUNT            = 19;
+    private static final int URI_UPDATE_THREAD_DATE                = 20;
 
     /**
      * the name of the table that is used to store the queue of
@@ -267,6 +268,8 @@ public class MmsSmsProvider extends ContentProvider {
         // "subject" and "recipient."  Multiple "recipient" parameters
         // may be present.
         URI_MATCHER.addURI(AUTHORITY, "threadID", URI_THREAD_ID);
+
+        URI_MATCHER.addURI(AUTHORITY, "update-date", URI_UPDATE_THREAD_DATE);
 
         // Use this pattern to query the canonical address by given ID.
         URI_MATCHER.addURI(AUTHORITY, "canonical-address/#", URI_CANONICAL_ADDRESS);
@@ -1330,6 +1333,9 @@ public class MmsSmsProvider extends ContentProvider {
                 break;
             }
 
+            case URI_UPDATE_THREAD_DATE:
+                MmsSmsDatabaseHelper.updateThreadsDate(db, selection, selectionArgs);
+                break;
             default:
                 throw new UnsupportedOperationException(
                         NO_DELETES_INSERTS_OR_UPDATES + uri);
