@@ -234,6 +234,9 @@ public class TelephonyProvider extends ContentProvider
         }
 
         private void createSimInfoTable(SQLiteDatabase db) {
+            int speechEnabled = mContext.getResources().getInteger(R.integer.config_speech_enabled);
+            int aletSoundDuration =  mContext.getResources().getInteger(R.integer.config_alert_sound_duration);
+
             if (DBG) log("dbh.createSimInfoTable:+");
             db.execSQL("CREATE TABLE " + SIMINFO_TABLE + "("
                     + SubscriptionManager.UNIQUE_KEY_SUBSCRIPTION_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -255,10 +258,10 @@ public class TelephonyProvider extends ContentProvider
                     + SubscriptionManager.CB_SEVERE_THREAT_ALERT + " INTEGER DEFAULT 1,"
                     + SubscriptionManager.CB_AMBER_ALERT + " INTEGER DEFAULT 1,"
                     + SubscriptionManager.CB_EMERGENCY_ALERT + " INTEGER DEFAULT 1,"
-                    + SubscriptionManager.CB_ALERT_SOUND_DURATION + " INTEGER DEFAULT 4,"
+                    + SubscriptionManager.CB_ALERT_SOUND_DURATION + " INTEGER DEFAULT " + aletSoundDuration + ","
                     + SubscriptionManager.CB_ALERT_REMINDER_INTERVAL + " INTEGER DEFAULT 0,"
                     + SubscriptionManager.CB_ALERT_VIBRATE + " INTEGER DEFAULT 1,"
-                    + SubscriptionManager.CB_ALERT_SPEECH + " INTEGER DEFAULT 1,"
+                    + SubscriptionManager.CB_ALERT_SPEECH + " INTEGER DEFAULT " + speechEnabled + ","
                     + SubscriptionManager.CB_ETWS_TEST_ALERT + " INTEGER DEFAULT 0,"
                     + SubscriptionManager.CB_CHANNEL_50_ALERT + " INTEGER DEFAULT 1,"
                     + SubscriptionManager.CB_CMAS_TEST_ALERT + " INTEGER DEFAULT 0,"
