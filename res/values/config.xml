@@ -11,4 +11,10 @@
     <!-- The preferred APN to use, in the format name,mcc,mnc
          Leave empty to choose automatically. -->
     <string name="config_preferred_apn"></string>
+
+    <!-- Setting to control if alert message should be read -->
+    <integer name="config_speech_enabled">1</integer>
+
+    <!-- Setting to control default duration for alert sound -->
+    <integer name="config_alert_sound_duration">4</integer>
 </resources>
