@@ -84,6 +84,7 @@ public class TelephonyProvider extends ContentProvider
     private static final int URL_PREFERAPN_NO_UPDATE_USING_SUBID = 12;
     private static final int URL_SIMINFO_USING_SUBID = 13;
     private static final int URL_UPDATE_DB = 14;
+    private static final int URL_PREFERAPN_USING_SUBID_IMSI = 15;
 
     private static final String TAG = "TelephonyProvider";
     private static final String CARRIERS_TABLE = "carriers";
@@ -92,6 +93,7 @@ public class TelephonyProvider extends ContentProvider
 
     private static final String PREF_FILE = "preferred-apn";
     private static final String COLUMN_APN_ID = "apn_id";
+    private static final String COLUMN_APN_IMSI_ID = "apn_id";
 
     private static final String PREF_FILE_FULL_APN = "preferred-full-apn";
     private static final String DB_VERSION_KEY = "version";
@@ -155,6 +157,10 @@ public class TelephonyProvider extends ContentProvider
         s_urlMatcher.addURI("telephony", "carriers/preferapn/subId/*", URL_PREFERAPN_USING_SUBID);
         s_urlMatcher.addURI("telephony", "carriers/preferapn_no_update/subId/*",
                 URL_PREFERAPN_NO_UPDATE_USING_SUBID);
+        s_urlMatcher.addURI("telephony", "carriers/preferapn/subIdImsi/#/*",
+                URL_PREFERAPN_USING_SUBID_IMSI);
+        s_urlMatcher.addURI("telephony", "carriers/preferapn_no_update/subIdImsi/#/*",
+                URL_PREFERAPN_USING_SUBID_IMSI);
 
         s_urlMatcher.addURI("telephony", "carriers/update_db", URL_UPDATE_DB);
 
@@ -1635,6 +1641,27 @@ public class TelephonyProvider extends ContentProvider
         return apnId;
     }
 
+    private void setPreferredApnId(Long id, int subId, String imsi) {
+        SharedPreferences sp = getContext().getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sp.edit();
+        editor.putLong(COLUMN_APN_IMSI_ID + subId + imsi, id != null ? id.longValue() : INVALID_APN_ID);
+        editor.apply();
+        // remove saved apn if apnId is invalid
+        if (id == null || id.longValue() == INVALID_APN_ID) {
+            deletePreferredApn(subId);
+        }
+    }
+
+    private long getPreferredApnId(int subId, String imsi, boolean checkApnSp) {
+        SharedPreferences sp = getContext().getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE);
+        long apnId = sp.getLong(COLUMN_APN_IMSI_ID + subId + imsi, INVALID_APN_ID);
+        if (apnId == INVALID_APN_ID) {
+            // fallback
+            return getPreferredApnId(subId, checkApnSp);
+        }
+        return apnId;
+    }
+
     private long getDefaultPreferredApnId() {
         long id = -1;
         String configPref = getContext().getResources().getString(R.string.config_preferred_apn, "");
@@ -1829,6 +1856,13 @@ public class TelephonyProvider extends ContentProvider
                 break;
             }
 
+            case URL_PREFERAPN_USING_SUBID_IMSI:
+                final List<String> segments = url.getPathSegments();
+                String imsi = segments.get(segments.size() - 1);
+                subId = Integer.parseInt(segments.get(segments.size() - 2));
+                qb.appendWhere("_id = " + getPreferredApnId(subId, imsi, true));
+                break;
+
             case URL_SIMINFO: {
                 qb.setTables(SIMINFO_TABLE);
                 break;
@@ -1897,6 +1931,7 @@ public class TelephonyProvider extends ContentProvider
 
         case URL_PREFERAPN_USING_SUBID:
         case URL_PREFERAPN_NO_UPDATE_USING_SUBID:
+        case URL_PREFERAPN_USING_SUBID_IMSI:
         case URL_PREFERAPN:
         case URL_PREFERAPN_NO_UPDATE:
             return "vnd.android.cursor.item/telephony-carrier";
@@ -2032,7 +2067,16 @@ public class TelephonyProvider extends ContentProvider
                 }
                 break;
             }
-
+            case URL_PREFERAPN_USING_SUBID_IMSI:
+                final List<String> segments = url.getPathSegments();
+                String imsi = segments.get(segments.size() - 1);
+                subId = Integer.parseInt(segments.get(segments.size() - 2));
+                if (initialValues != null) {
+                    if(initialValues.containsKey(COLUMN_APN_ID)) {
+                        setPreferredApnId(initialValues.getAsLong(COLUMN_APN_ID), subId, imsi);
+                    }
+                }
+                break;
             case URL_SIMINFO: {
                long id = db.insert(SIMINFO_TABLE, null, initialValues);
                result = ContentUris.withAppendedId(SubscriptionManager.CONTENT_URI, id);
@@ -2165,6 +2209,11 @@ public class TelephonyProvider extends ContentProvider
                 if ((match == URL_PREFERAPN) || (match == URL_PREFERAPN_USING_SUBID)) count = 1;
                 break;
             }
+            case URL_PREFERAPN_USING_SUBID_IMSI: {
+                setPreferredApnId(-1L, subId, "");
+                count = 1;
+                break;
+            }
 
             case URL_SIMINFO: {
                 count = db.delete(SIMINFO_TABLE, where, whereArgs);
@@ -2287,6 +2336,17 @@ public class TelephonyProvider extends ContentProvider
                     throw new IllegalArgumentException("Invalid subId " + url);
                 }
                 if (DBG) log("subIdString = " + subIdString + " subId = " + subId);
+            }
+            case URL_PREFERAPN_USING_SUBID_IMSI: {
+                final List<String> segments = url.getPathSegments();
+                String imsi = segments.get(segments.size() - 1);
+                subId = Integer.parseInt(segments.get(segments.size() - 2));
+                if (values != null) {
+                    if(values.containsKey(COLUMN_APN_ID)) {
+                        setPreferredApnId(values.getAsLong(COLUMN_APN_ID), subId, imsi);
+                    }
+                }
+                break;
             }
 
             case URL_PREFERAPN:
