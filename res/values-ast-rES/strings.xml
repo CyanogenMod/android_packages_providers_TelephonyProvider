@@ -15,6 +15,18 @@
      limitations under the License.
 -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+  <!-- Official label of the TelephonyProvider, as seen in the "Manage
+         Applications" UI.  This is the version of the label for tablet
+         devices, where the TelephonyProvider stores configuration info
+         about the mobile data network. [CHAR LIMIT=40] -->
   <string name="app_label" product="tablet">Configuración de rede móvil</string>
+  <!-- Official label of the TelephonyProvider, as seen in the "Manage
+         Applications" UI.  The TelephonyProvider stores configuration
+         info about the carrier and cell network, and also provides
+         storage for SMS and MMS messages. [CHAR LIMIT=25] -->
   <string name="app_label" product="default">Almacenamientu teléfonu/mensaxes</string>
+  <!-- Apn PPP number -->
+  <!-- Apn read only -->
+  <!-- Apn localized name -->
+  <!-- default protocol -->
 </resources>
