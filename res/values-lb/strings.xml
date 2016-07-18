@@ -24,6 +24,7 @@
          Applications" UI.  The TelephonyProvider stores configuration
          info about the carrier and cell network, and also provides
          storage for SMS and MMS messages. [CHAR LIMIT=40] -->
+  <string name="app_label" product="default">Telefon- an SMS-Späicher</string>
   <!-- Apn read only -->
   <!-- Apn PPP number -->
   <!-- Apn localized name -->
