@@ -79,6 +79,8 @@ public class MmsProvider extends ContentProvider {
     static final String PARTS_DIR_NAME = "parts";
     static final String COLUMN_PDU_PATH = "pdu_path";
 
+    private static final int MAX_FILE_NAME_LENGTH = 30;
+
     private final static String[] PDU_COLUMNS = new String[] {
         "_id",
         "pdu_path",
@@ -639,7 +641,7 @@ public class MmsProvider extends ContentProvider {
                 String contentLocation = values.getAsString("cl");
                 if (!TextUtils.isEmpty(contentLocation)) {
                     File f = new File(contentLocation);
-                    contentLocation = "_" + f.getName();
+                    contentLocation = "_" + getFileName(contentLocation);
                 } else {
                     contentLocation = "";
                 }
@@ -744,6 +746,15 @@ public class MmsProvider extends ContentProvider {
             notifyChange(res);
         }
         return res;
+    }
+
+    private String getFileName(String fileLocation) {
+        File f = new File(fileLocation);
+        String fileName = f.getName();
+        if (fileName.length() >= MAX_FILE_NAME_LENGTH) {
+            fileName = fileName.substring(0, MAX_FILE_NAME_LENGTH);
+        }
+        return fileName;
     }
 
     private int getMessageBoxByMatch(int match) {
