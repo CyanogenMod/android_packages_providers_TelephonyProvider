@@ -99,9 +99,15 @@ public class MmsSmsProvider extends ContentProvider {
     private static final int URI_FIRST_LOCKED_MESSAGE_ALL          = 16;
     private static final int URI_FIRST_LOCKED_MESSAGE_BY_THREAD_ID = 17;
     private static final int URI_MESSAGE_ID_TO_THREAD              = 18;
-    private static final int URI_MESSAGES_COUNT            = 19;
+    private static final int URI_MESSAGES_COUNT                    = 19;
     private static final int URI_UPDATE_THREAD_DATE                = 20;
+    private static final int URI_SEARCH_MESSAGE                    = 21;
+    // Escape character
+    private static final char SEARCH_ESCAPE_CHARACTER = '!';
 
+    public static final int SEARCH_MODE_CONTENT = 0;
+    public static final int SEARCH_MODE_NAME = 1;
+    private static final long RESULT_FOR_ID_NOT_FOUND = -1L;
     /**
      * the name of the table that is used to store the queue of
      * messages(both MMS and SMS) to be sent/downloaded.
@@ -112,6 +118,7 @@ public class MmsSmsProvider extends ContentProvider {
      * the name of the table that is used to store the canonical addresses for both SMS and MMS.
      */
     private static final String TABLE_CANONICAL_ADDRESSES = "canonical_addresses";
+    private static final String DEFAULT_STRING_ZERO = "0";
 
     /**
      * the name of the table that is used to store the conversation threads.
@@ -259,6 +266,8 @@ public class MmsSmsProvider extends ContentProvider {
 
         // URI for deleting obsolete threads.
         URI_MATCHER.addURI(AUTHORITY, "conversations/obsolete", URI_OBSOLETE_THREADS);
+
+        URI_MATCHER.addURI(AUTHORITY, "search-message", URI_SEARCH_MESSAGE);
 
         URI_MATCHER.addURI(
                 AUTHORITY, "messages/byphone/*",
@@ -471,6 +480,9 @@ public class MmsSmsProvider extends ContentProvider {
                 }
                 break;
             }
+            case URI_SEARCH_MESSAGE:
+                cursor = getSearchMessages(uri, db, smsTable, pduTable);
+                break;
             case URI_PENDING_MSG: {
                 String protoName = uri.getQueryParameter("protocol");
                 String msgId = uri.getQueryParameter("message");
@@ -594,7 +606,7 @@ public class MmsSmsProvider extends ContentProvider {
         for (String address : addresses) {
             if (!address.equals(PduHeaders.FROM_INSERT_ADDRESS_TOKEN_STR)) {
                 long id = getSingleAddressId(address);
-                if (id != -1L) {
+                if (id != RESULT_FOR_ID_NOT_FOUND) {
                     result.add(id);
                 } else {
                     Log.e(LOG_TAG, "getAddressIds: address ID not found for " + address);
@@ -1417,5 +1429,282 @@ public class MmsSmsProvider extends ContentProvider {
             defaultSmsApp = "None";
         }
         writer.println("Default SMS app: " + defaultSmsApp);
+    }
+
+    private Cursor getSearchMessages(Uri uri, SQLiteDatabase db,
+                                     String smsTable, String pduTable) {
+        int searchMode = Integer.parseInt(uri.getQueryParameter("search_mode"));
+        String keyStr = uri.getQueryParameter("key_str");
+        String address = uri.getQueryParameter("contact_addr");
+        String searchString = "%" + addEscapeCharacter(keyStr) + "%";
+        String threadIdString = DEFAULT_STRING_ZERO;
+
+        if (searchMode == SEARCH_MODE_NAME) {
+            threadIdString = getThreadIdByAddress(address);
+            if (threadIdString.equals(DEFAULT_STRING_ZERO)) {
+                searchMode = SEARCH_MODE_CONTENT;
+            }
+        }
+        if (DEBUG) {
+            Log.d(LOG_TAG, "keystr=" + searchString +
+                    "|searchMode=" + searchMode + "|address=" + address);
+        }
+        String rawQuery = getConversationQueryString(searchMode, smsTable,
+                pduTable, threadIdString);
+        String[] strArray = new String[]{searchString, searchString, searchString,
+                searchString, searchString};
+        return db.rawQuery(rawQuery, strArray);
+    }
+
+    private String getThreadIdByAddress(String keyStr) {
+        long[] addressIdSet = getSortedSet(getThreadIdsByAddressList(keyStr.split(",")));
+        String threadIdString = getCommaSeparatedId(addressIdSet);
+        if (TextUtils.isEmpty(threadIdString)) {
+            threadIdString = DEFAULT_STRING_ZERO;
+        }
+        if (DEBUG) {
+            Log.d(LOG_TAG, "getThreadIdByAddress=" + threadIdString);
+        }
+        return threadIdString;
+    }
+
+    private String addEscapeCharacter(String keyStr) {
+        if (keyStr == null) {
+            return keyStr;
+        }
+        if (keyStr.contains("%") ||
+                keyStr.contains(String.valueOf(SEARCH_ESCAPE_CHARACTER))) {
+            StringBuilder searchKeyStrBuilder = new StringBuilder();
+            int keyStrLen = keyStr.length();
+            for (int i = 0; i < keyStrLen; i++) {
+                if (keyStr.charAt(i) == '%' ||
+                        keyStr.charAt(i) == SEARCH_ESCAPE_CHARACTER) {
+                    searchKeyStrBuilder.append(SEARCH_ESCAPE_CHARACTER);
+                    searchKeyStrBuilder.append(keyStr.charAt(i));
+                    continue;
+                }
+                searchKeyStrBuilder.append(keyStr.charAt(i));
+            }
+            return searchKeyStrBuilder.toString();
+        }
+        return keyStr;
+    }
+
+    private Set<Long> getThreadIdsByAddressList(String[] addresses) {
+        int count = addresses.length;
+        Set<Long> result = new HashSet<Long>(count);
+
+        for (int i = 0; i < count; i++) {
+            String address = addresses[i];
+            if (address != null && !address.equals(PduHeaders.FROM_INSERT_ADDRESS_TOKEN_STR)) {
+                long id = getSingleThreadId(address);
+                if (id != RESULT_FOR_ID_NOT_FOUND) {
+                    result.add(id);
+                } else {
+                    Log.e(LOG_TAG, "Address ID not found for: " + address);
+                }
+            }
+        }
+        return result;
+    }
+
+    private String getCommaSeparatedId(long[] addrIds) {
+        int size = addrIds.length;
+        StringBuilder buffer = new StringBuilder();
+
+        for (int i = 0; i < size; i++) {
+            if (i != 0) {
+                buffer.append(',');
+            }
+            buffer.append(getThreadIds(String.valueOf(addrIds[i])));
+        }
+        return buffer.toString();
+    }
+
+    private long getSingleThreadId(String address) {
+        boolean isEmail = Mms.isEmailAddress(address);
+        String refinedAddress = isEmail ? address.toLowerCase() : address;
+        String selection = "address=?";
+        String[] selectionArgs;
+
+        if (isEmail) {
+            selectionArgs = new String[]{refinedAddress};
+        } else {
+            selection += " OR " + String.format("PHONE_NUMBERS_EQUAL(address, ?, %d)",
+                    (mUseStrictPhoneNumberComparation ? 1 : 0));
+            selectionArgs = new String[]{refinedAddress, refinedAddress};
+        }
+
+        Cursor cursor = null;
+
+        try {
+            SQLiteDatabase db = mOpenHelper.getReadableDatabase();
+            cursor = db.query(
+                    "canonical_addresses", ID_PROJECTION,
+                    selection, selectionArgs, null, null, null);
+
+            if (cursor.getCount() == 0) {
+                return RESULT_FOR_ID_NOT_FOUND;
+            }
+
+            if (cursor.moveToFirst()) {
+                return cursor.getLong(cursor.getColumnIndexOrThrow(BaseColumns._ID));
+            }
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+
+        return RESULT_FOR_ID_NOT_FOUND;
+    }
+
+    private String getConversationQueryString(int searchMode,
+                String smsTable, String pduTable, final String threadIds) {
+        String nameQuery = "";
+        String smsContentQuery = "";
+        String pduContentQuery = "";
+        String rawQuery = "";
+
+        final String NAME_PROJECTION = "threads._id AS _id,"
+                + "threads.date AS date,"
+                + "threads.message_count AS message_count,"
+                + "threads.recipient_ids AS recipient_ids,"
+                + "threads.snippet AS snippet,"
+                + "threads.snippet_cs AS snippet_cs,"
+                + "threads.read AS read,"
+                + "NULL AS error,"
+                + "threads.has_attachment AS has_attachment,"
+                + "threads.attachment_info AS attachment_info";
+        final String SMS_PROJECTION = "threads._id AS _id,"
+                + smsTable + ".date AS date,"
+                + "threads.message_count AS message_count,"
+                + "threads.recipient_ids AS recipient_ids,"
+                + smsTable + ".body AS snippet,"
+                + "threads.snippet_cs AS snippet_cs,"
+                + "threads.read AS read,"
+                + "NULL AS error,"
+                + "threads.has_attachment AS has_attachment,"
+                + "'SMS' AS attachment_info";
+        final String PDU_PROJECTION = "threads._id AS _id,"
+                + pduTable + ".date * 1000 AS date,"
+                + "threads.message_count AS message_count,"
+                + "threads.recipient_ids AS recipient_ids,"
+                + pduTable + ".sub AS snippet,"
+                + pduTable + ".sub_cs AS snippet_cs,"
+                + "threads.read AS read,"
+                + "NULL AS error,"
+                + "threads.has_attachment AS has_attachment,"
+                + "part.text AS attachment_info";
+
+        if (searchMode == SEARCH_MODE_NAME) {
+            nameQuery = String.format(
+                    "SELECT %s FROM threads WHERE threads._id in (%s)",
+                    NAME_PROJECTION,
+                    threadIds);
+            smsContentQuery = String.format("SELECT %s FROM threads, " + smsTable
+                    + " WHERE ("
+                    + "(threads._id NOT in (%s))"
+                    + " AND (" + smsTable + ".thread_id = " + "threads._id )"
+                    + " AND ((" + smsTable + ".body LIKE ? ESCAPE '"
+                    + SEARCH_ESCAPE_CHARACTER + "')"
+                    + " OR (" + smsTable + ".address LIKE ? ESCAPE '"
+                    + SEARCH_ESCAPE_CHARACTER + "')))"
+                    + " GROUP BY threads._id",
+                    SMS_PROJECTION,
+                    threadIds);
+            pduContentQuery = String.format("SELECT %s FROM threads, addr, part, " + pduTable
+                    + " WHERE((threads._id NOT in (%s))"
+                    + " AND (addr.msg_id=" + pduTable + "._id)"
+                    + " AND (addr.type=%d)"
+                    + " AND (part.mid=" + pduTable + "._id)"
+                    + " AND (part.ct='text/plain')"
+                    + " AND (threads._id =" + pduTable + ".thread_id)"
+                    + " AND ((part.text LIKE ? ESCAPE '" + SEARCH_ESCAPE_CHARACTER + "')"
+                    + " OR (addr.address LIKE ? ESCAPE '" + SEARCH_ESCAPE_CHARACTER + "')"
+                    + " OR (" + pduTable + ".sub LIKE ? ESCAPE '"
+                    + SEARCH_ESCAPE_CHARACTER + "')))",
+                    PDU_PROJECTION,
+                    threadIds,
+                    PduHeaders.TO);
+
+            rawQuery = String.format(
+                    "%s UNION %s UNION %s GROUP BY threads._id ORDER BY date DESC",
+                    nameQuery,
+                    smsContentQuery,
+                    pduContentQuery);
+        } else {
+            smsContentQuery = String.format("SELECT %s FROM threads, " + smsTable
+                    + " WHERE ("
+                    + "(" + smsTable + ".thread_id = " + "threads._id )"
+                    + " AND ((" + smsTable + ".body LIKE ? ESCAPE '"
+                    + SEARCH_ESCAPE_CHARACTER + "')"
+                    + " OR (" + smsTable + ".address LIKE ? ESCAPE '"
+                    + SEARCH_ESCAPE_CHARACTER + "')))"
+                    + " GROUP BY threads._id",
+                    SMS_PROJECTION);
+            pduContentQuery = String.format("SELECT %s FROM threads, addr, part, " + pduTable
+                    + " WHERE((addr.msg_id=" + pduTable + "._id)"
+                    + " AND (addr.type=%d)"
+                    + " AND (part.mid=" + pduTable + "._id)"
+                    + " AND (part.ct='text/plain')"
+                    + " AND (threads._id =" + pduTable + ".thread_id)"
+                    + " AND ((part.text LIKE ? ESCAPE '" + SEARCH_ESCAPE_CHARACTER + "')"
+                    + " OR (addr.address LIKE ? ESCAPE '" + SEARCH_ESCAPE_CHARACTER + "')"
+                    + " OR (" + pduTable + ".sub LIKE ? ESCAPE '"
+                    + SEARCH_ESCAPE_CHARACTER + "')))",
+                    PDU_PROJECTION,
+                    PduHeaders.TO);
+
+            rawQuery = String.format(
+                    "%s UNION %s GROUP BY threads._id ORDER BY date DESC",
+                    smsContentQuery,
+                    pduContentQuery);
+        }
+        if (DEBUG) {
+            Log.d(LOG_TAG, "getConversationQueryString = " + rawQuery);
+        }
+        return rawQuery;
+    }
+
+    private synchronized String getThreadIds(String recipientIds) {
+        String THREAD_QUERY = "SELECT _id FROM threads " +
+                "WHERE recipient_ids = ? or recipient_ids like '" + recipientIds
+                + " %' or recipient_ids like '% " + recipientIds
+                + "' or recipient_ids like '% " + recipientIds + " %'";
+        String resultString = DEFAULT_STRING_ZERO;
+        StringBuilder buffer = new StringBuilder();
+
+        if (DEBUG) {
+            Log.v(LOG_TAG, "getThreadId THREAD_QUERY: " + THREAD_QUERY +
+                    ", recipientIds=" + recipientIds);
+        }
+        Cursor cursor = null;
+        try {
+            SQLiteDatabase db = mOpenHelper.getReadableDatabase();
+            cursor = db.rawQuery(THREAD_QUERY, new String[]{
+                    recipientIds
+            });
+
+            if (cursor == null || cursor.getCount() == 0) {
+                return resultString;
+            }
+            int i = 0;
+            while (cursor.moveToNext()) {
+                if (i != 0) {
+                    buffer.append(',');
+                }
+                buffer.append(String.valueOf(cursor.getLong(0)));
+                i++;
+            }
+            resultString = buffer.toString();
+
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+
+        return resultString;
     }
 }
