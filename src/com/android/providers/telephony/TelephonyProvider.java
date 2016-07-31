@@ -1794,13 +1794,29 @@ public class TelephonyProvider extends ContentProvider
     }
 
     private long getPreferredApnId(int subId, boolean checkApnSp) {
+        Log.d(TAG, "getPreferredApnId: subId = " + subId + ", checkApnSp = " + checkApnSp);
         SharedPreferences sp = getContext().getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE);
         long apnId = sp.getLong(COLUMN_APN_ID + subId, INVALID_APN_ID);
-        if (apnId == INVALID_APN_ID && checkApnSp) {
-            apnId = getPreferredApnIdFromApn(subId);
-            if (apnId != INVALID_APN_ID) {
-                setPreferredApnId(apnId, subId);
-                deletePreferredApn(subId);
+        if (apnId == INVALID_APN_ID) {
+            if(checkApnSp) {
+                apnId = getPreferredApnIdFromApn(subId);
+                if (apnId == INVALID_APN_ID) {
+                    apnId = getDefaultPreferredApnId();
+
+                    if (apnId != INVALID_APN_ID) {
+                        setPreferredApnId(apnId, subId);
+                    }
+                }
+                else {
+                    setPreferredApnId(apnId, subId);
+                    deletePreferredApn(subId);
+                }
+            }
+            else {
+                apnId = getDefaultPreferredApnId();
+                if (apnId != INVALID_APN_ID) {
+                    setPreferredApnId(apnId, subId);
+                }
             }
         }
         return apnId;
@@ -1832,6 +1848,8 @@ public class TelephonyProvider extends ContentProvider
         long id = -1;
         String configPref = getContext().getResources().getString(R.string.config_preferred_apn, "");
         if (!TextUtils.isEmpty(configPref)) {
+            Log.d(TAG, "config_preferred_apn: " + configPref);
+
             String[] s = configPref.split(",");
             if (s.length == 3 || s.length == 4) {
                 Cursor c = mOpenHelper.getReadableDatabase().query("carriers", new String[] { "_id" },
