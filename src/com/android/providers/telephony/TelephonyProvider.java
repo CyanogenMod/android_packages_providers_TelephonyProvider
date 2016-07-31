@@ -1539,11 +1539,24 @@ public class TelephonyProvider extends ContentProvider
         SharedPreferences sp = getContext().getSharedPreferences(PREF_FILE_APN,
                 Context.MODE_PRIVATE);
         long apnId = sp.getLong(COLUMN_APN_ID + subId, INVALID_APN_ID);
-        if (apnId == INVALID_APN_ID && checkApnSp) {
-            apnId = getDefaultPreferredApnId();
-            if (apnId > INVALID_APN_ID) {
-                setPreferredApnId(apnId, subId);
-                deletePreferredApn(subId);
+        if (apnId == INVALID_APN_ID) {
+            if (checkApnSp) {
+                apnId = getPreferredApnIdFromApn(subId);
+                if (apnId == INVALID_APN_ID) {
+                    apnId = getDefaultPreferredApnId();
+
+                    if (apnId != INVALID_APN_ID) {
+                        setPreferredApnId(apnId, subId);
+                    }
+                } else {
+                    setPreferredApnId(apnId, subId);
+                    deletePreferredApn(subId);
+                }
+            } else {
+                apnId = getDefaultPreferredApnId();
+                if (apnId != INVALID_APN_ID) {
+                    setPreferredApnId(apnId, subId);
+                }
             }
         }
         return apnId;
