@@ -68,7 +68,7 @@ public class TelephonyProvider extends ContentProvider
     private static final boolean DBG = true;
     private static final boolean VDBG = false; // STOPSHIP if true
 
-    private static final int DATABASE_VERSION = 22 << 16;
+    private static final int DATABASE_VERSION = 23 << 16;
     private static final int URL_UNKNOWN = 0;
     private static final int URL_TELEPHONY = 1;
     private static final int URL_CURRENT = 2;
@@ -117,15 +117,16 @@ public class TelephonyProvider extends ContentProvider
     private static final ContentValues s_currentNullMap;
     private static final ContentValues s_currentSetMap;
 
-    private static final int UNIQUE_KEY_SIZE = 16;
+    private static final int UNIQUE_KEY_SIZE = 17;
 
     private static final int INVALID_APN_ID = -1;
     private static final List<String> CARRIERS_UNIQUE_FIELDS = new ArrayList<String>();
 
     static {
-        // Columns not included in UNIQUE constraint: name, current, edited, user, server, password,
+        // Columns not included in UNIQUE constraint: current, edited, user, server, password,
         // authtype, type, protocol, roaming_protocol, sub_id, modem_cognitive, max_conns, wait_time,
         // max_conns_time, mtu, bearer_bitmask, user_visible
+        CARRIERS_UNIQUE_FIELDS.add(Telephony.Carriers.NAME);
         CARRIERS_UNIQUE_FIELDS.add(Telephony.Carriers.NUMERIC);
         CARRIERS_UNIQUE_FIELDS.add(Telephony.Carriers.MCC);
         CARRIERS_UNIQUE_FIELDS.add(Telephony.Carriers.MNC);
@@ -321,11 +322,11 @@ public class TelephonyProvider extends ContentProvider
                     "visit_area TEXT DEFAULT ''," +
                     // Uniqueness collisions are used to trigger merge code so if a field is listed
                     // here it means we will accept both (user edited + new apn_conf definition)
-                    // Columns not included in UNIQUE constraint: name, current, edited,
+                    // Columns not included in UNIQUE constraint: current, edited,
                     // user, server, password, authtype, type, sub_id,
                     // modem_cognitive, max_conns, wait_time, max_conns_time, mtu, bearer_bitmask
                     // Change UNIQUE_KEY_SIZE if the UNIQUE set is changed
-                    "UNIQUE (numeric, mcc, mnc, apn, proxy, port, mmsproxy, mmsport, mmsc, protocol, roaming_protocol," +
+                    "UNIQUE (name, numeric, mcc, mnc, apn, proxy, port, mmsproxy, mmsport, mmsc, protocol, roaming_protocol," +
                     "carrier_enabled, bearer, mvno_type, mvno_match_data, profile_id));");
             if (DBG) log("dbh.createCarriersTable:-");
         }
@@ -1675,6 +1676,7 @@ public class TelephonyProvider extends ContentProvider
 
             int i = 0;
             String[] selectionArgs = new String[UNIQUE_KEY_SIZE];
+            selectionArgs[i++] = row.getAsString(Telephony.Carriers.NAME);
             selectionArgs[i++] = row.getAsString(Telephony.Carriers.NUMERIC);
             selectionArgs[i++] = row.getAsString(Telephony.Carriers.MCC);
             selectionArgs[i++] = row.getAsString(Telephony.Carriers.MNC);
