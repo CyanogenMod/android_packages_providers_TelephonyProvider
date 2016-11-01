@@ -189,7 +189,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
     private static final String NO_SUCH_TABLE_EXCEPTION_MESSAGE = "no such table";
 
     static final String DATABASE_NAME = "mmssms.db";
-    static final int DATABASE_VERSION = 64;
+    static final int DATABASE_VERSION = 67;
     private final Context mContext;
     private LowStorageMonitor mLowStorageMonitor;
 
@@ -1413,20 +1413,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             }
             // fall through
         case 60:
-            if (currentVersion <= 60) {
-                return;
-            }
-
-            db.beginTransaction();
-            try {
-                upgradeDatabaseToVersion61(db);
-                db.setTransactionSuccessful();
-            } catch (Throwable ex) {
-                Log.e(TAG, ex.getMessage(), ex);
-                break;
-            } finally {
-                db.endTransaction();
-            }
+            // Priority column is now part of onOpen()
             // fall through
         case 61:
             if (currentVersion <= 61) {
@@ -1445,20 +1432,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             }
             // fall through
         case 62:
-            if (currentVersion <= 62) {
-                return;
-            }
-
-            db.beginTransaction();
-            try {
-                upgradeDatabaseToVersion63(db);
-                db.setTransactionSuccessful();
-            } catch (Throwable ex) {
-                Log.e(TAG, ex.getMessage(), ex);
-                break;
-            } finally {
-                db.endTransaction();
-            }
+            // Priority column is now part of onOpen()
             // fall through
         case 63:
             if (currentVersion <= 63) {
@@ -1468,6 +1442,46 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             db.beginTransaction();
             try {
                 upgradeDatabaseToVersion64(db);
+                db.setTransactionSuccessful();
+            } catch (Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+                break;
+            } finally {
+                db.endTransaction();
+            }
+            // fall through
+        case 64:
+            if (currentVersion <= 64) {
+                return;
+            }
+            // Unread count as a feature is dropped
+            // fall through
+        case 65:
+            if (currentVersion <= 65) {
+                return;
+            }
+
+            db.beginTransaction();
+            try {
+                upgradeDatabaseToVersion66(db);
+                db.setTransactionSuccessful();
+            } catch (Throwable ex) {
+                Log.e(TAG, ex.getMessage(), ex);
+                break;
+            } finally {
+                db.endTransaction();
+            }
+            //fall through
+        case 66:
+            if (currentVersion <= 66) {
+                return;
+            }
+
+            db.beginTransaction();
+            try {
+                upgradeDatabaseToAOSPVersion62(db);
+                upgradeDatabaseToAOSPVersion63(db);
+                upgradeDatabaseToAOSPVersion64(db);
                 db.setTransactionSuccessful();
             } catch (Throwable ex) {
                 Log.e(TAG, ex.getMessage(), ex);
@@ -1703,7 +1717,7 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
                 + Threads.ARCHIVED + " INTEGER DEFAULT 0");
     }
 
-    private void upgradeDatabaseToVersion61(SQLiteDatabase db) {
+    private void upgradeDatabaseToVersion66(SQLiteDatabase db) {
         db.execSQL("CREATE VIEW " + SmsProvider.VIEW_SMS_RESTRICTED + " AS " +
                    "SELECT * FROM " + SmsProvider.TABLE_SMS + " WHERE " +
                    Sms.TYPE + "=" + Sms.MESSAGE_TYPE_INBOX +
@@ -1719,7 +1733,93 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
 
     }
 
+    // Determine whether this database has CM11 columns...
+    private boolean isCM11DB(SQLiteDatabase db) {
+        Cursor c = null;
+        try {
+            final String query = "SELECT sub_id, pri FROM sms";
+            c = db.rawQuery(query, null);
+        } catch (Exception e) {
+        } finally {
+            if (c != null) {
+                c.close();
+            }
+        }
+        return c != null;
+    }
+
     private void upgradeDatabaseToVersion62(SQLiteDatabase db) {
+        if (isCM11DB(db)) {
+            // CM11 was 60, which means we skipped a few updates...
+            try {
+                upgradeDatabaseToVersion58(db);
+            } catch (Exception e) { }
+            try {
+                upgradeDatabaseToVersion59(db);
+            } catch (Exception e) { }
+            try {
+                upgradeDatabaseToVersion60(db);
+            } catch (Exception e) { }
+        }
+    }
+
+    private void upgradeDatabaseToVersion64(SQLiteDatabase db) {
+        try {
+            db.execSQL("ALTER TABLE " + MmsProvider.TABLE_PDU +" ADD COLUMN "
+                    + Mms.SUBSCRIPTION_ID + " INTEGER DEFAULT -1");
+        } catch (SQLiteException e) {
+            // ignore (DB was older than version 58), we'll remove the data later
+        }
+        db.execSQL("ALTER TABLE " + MmsSmsProvider.TABLE_PENDING_MSG +" ADD COLUMN "
+                + "pending_sub_id" + " INTEGER DEFAULT 0");
+        try {
+            db.execSQL("ALTER TABLE " + SmsProvider.TABLE_SMS +" ADD COLUMN "
+                    + Sms.SUBSCRIPTION_ID + " INTEGER DEFAULT -1");
+        } catch (SQLiteException e) {
+            // see above
+        }
+        try {
+            db.execSQL("ALTER TABLE " + SmsProvider.TABLE_RAW +" ADD COLUMN "
+                    + Sms.SUBSCRIPTION_ID + " INTEGER DEFAULT -1");
+        } catch (SQLiteException e) {
+            // see above
+        }
+        // remove old data from the sub_id column (if present), it was already copied
+        // over to the phone_id column in upgradeDatabaseToVersion59
+        db.execSQL("UPDATE " + MmsProvider.TABLE_PDU + " SET " + Mms.SUBSCRIPTION_ID + " = -1");
+        db.execSQL("UPDATE " + SmsProvider.TABLE_SMS + " SET " + Sms.SUBSCRIPTION_ID + " = -1");
+        db.execSQL("UPDATE " + SmsProvider.TABLE_RAW + " SET " + Sms.SUBSCRIPTION_ID + " = -1");
+    }
+
+    // Try to copy data from existing src column to new column which supposed
+    // to be added before calling this functin.
+    // If src or dest column not exsit, it will just bail out.
+    private void tryCopyColumn(SQLiteDatabase db, String table,
+                               String srcColumn, String destColumn) {
+        if (isColumnExist(db, table, srcColumn) && isColumnExist(db, table, destColumn) ) {
+            db.execSQL("update " + table + " set " + destColumn + " = "
+                    + srcColumn);
+        }
+    }
+
+    private boolean isColumnExist(SQLiteDatabase db, String table, String column) {
+        Cursor cursor = db.query(table, null, null, null, null, null, null);
+        if (cursor != null) {
+            try {
+                cursor.getColumnIndexOrThrow(column);
+                return true;
+            } catch (IllegalArgumentException e) {
+                Log.e(TAG, "isColumnExsit: " + "table: " + table + " column: "
+                        + column + " IllegalArgumentException", e);
+                return false;
+            } finally {
+                cursor.close();
+            }
+        }
+        return false;
+    }
+
+    private void upgradeDatabaseToAOSPVersion62(SQLiteDatabase db) {
         // When a non-FBE device is upgraded to N, all MMS attachment files are moved from
         // /data/data to /data/user_de. We need to update the paths stored in the parts table to
         // reflect this change.
@@ -1749,11 +1849,11 @@ public class MmsSmsDatabaseHelper extends SQLiteOpenHelper {
             " WHERE INSTR(" + Part._DATA + ", '" + partsDirName + "') > 0");
     }
 
-    private void upgradeDatabaseToVersion63(SQLiteDatabase db) {
+    private void upgradeDatabaseToAOSPVersion63(SQLiteDatabase db) {
         db.execSQL("ALTER TABLE " + SmsProvider.TABLE_RAW +" ADD COLUMN deleted INTEGER DEFAULT 0");
     }
 
-    private void upgradeDatabaseToVersion64(SQLiteDatabase db) {
+    private void upgradeDatabaseToAOSPVersion64(SQLiteDatabase db) {
         db.execSQL("ALTER TABLE " + SmsProvider.TABLE_RAW +" ADD COLUMN message_body TEXT");
     }
     private void checkAndUpdateSmsTable(SQLiteDatabase db) {
