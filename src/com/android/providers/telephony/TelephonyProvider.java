@@ -265,6 +265,7 @@ public class TelephonyProvider extends ContentProvider
                     + SubscriptionManager.DATA_ROAMING + " INTEGER DEFAULT " + SubscriptionManager.DATA_ROAMING_DEFAULT + ","
                     + SubscriptionManager.MCC + " INTEGER DEFAULT 0,"
                     + SubscriptionManager.MNC + " INTEGER DEFAULT 0,"
+                    + SubscriptionManager.USER_NETWORK_MODE + " INTEGER DEFAULT " + RILConstants.PREFERRED_NETWORK_MODE + ","
                     + SubscriptionManager.CB_EXTREME_THREAT_ALERT + " INTEGER DEFAULT 1,"
                     + SubscriptionManager.CB_SEVERE_THREAT_ALERT + " INTEGER DEFAULT 1,"
                     + SubscriptionManager.CB_AMBER_ALERT + " INTEGER DEFAULT 1,"
@@ -576,7 +577,8 @@ public class TelephonyProvider extends ContentProvider
                 upgradeForSubscriptionInfoIfNecessary(db);
                 oldVersion = 13 << 16 | 6;
             }
-            if (oldVersion < (16 << 16 | 6)) {
+            if (oldVersion < (14 << 16 | 6) || oldVersion < (15 << 16 | 6) ||
+                    oldVersion < (16 << 16 | 6)) {
                 // Handle migration from current AOSP (by artificially bumping the version
                 // and handle migration from cm-11.0, by checking for an existing column
                 // and then forcing the introduction of new columns
